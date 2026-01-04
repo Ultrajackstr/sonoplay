@@ -1,0 +1,66 @@
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Testing
+.pytest_cache/
+pytest_cache/
+pytest.ini
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE / Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment & secrets
+.env
+.env.local
+*.pem
+*.key
+secrets/
+
+# Project-specific
+config/
+data/
+temp/
+start.sh
+
+# Git worktrees
+.worktrees/
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-compose.override.yml
+.git.bak/

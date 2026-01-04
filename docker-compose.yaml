@@ -1,0 +1,10 @@
+services:
+  plexdlnaplayer:
+    build: .
+    container_name: plexdlnaplayer
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /usr/dockerdata/plexdlnaplayer/plexdlnaplayer/data:/config

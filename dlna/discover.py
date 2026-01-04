@@ -1,0 +1,149 @@
+import asyncio
+import socket
+import time
+
+from settings import settings
+
+SSDP_BROADCAST_PORT = 1900
+SSDP_BROADCAST_ADDR = "239.255.255.250"
+
+SSDP_SEARCH_TARGETS = [
+    "ssdp:all",
+    "upnp:rootdevice",
+    "urn:schemas-upnp-org:device:MediaRenderer:1",
+    "urn:schemas-upnp-org:service:AVTransport:1"
+]
+
+
+SEND_INTERVAL_SECS = 30
+RECENTLY_SEEN_THROTTLE_SECS = 60  # Ignore repeat announcements within this window
+
+
+def build_msearch(st: str):
+    params = [
+        "M-SEARCH * HTTP/1.1",
+        "HOST: {0}:{1}".format(SSDP_BROADCAST_ADDR, SSDP_BROADCAST_PORT),
+        "MAN: \"ssdp:discover\"",
+        "MX: 2",
+        f"ST: {st}",
+        "",
+        ""
+    ]
+    return "\r\n".join(params)
+
+
+def guess_local_ip():
+    if settings.host_ip and settings.host_ip not in ("0.0.0.0", "127.0.0.1"):
+        return settings.host_ip
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "0.0.0.0"
+
+
+def get_protocol(discover):
+
+    class DlnaProtocol(object):
+
+        def __init__(self):
+            self.transport = None
+            discover.protocol = self
+            self.is_connected = False
+
+        def connection_made(self, transport):
+            self.transport = transport
+            self.is_connected = True
+            print("dlna discover connected")
+            asyncio.create_task(self.send_loop())
+
+        async def send_loop(self):
+            while self.is_connected:
+                for st in SSDP_SEARCH_TARGETS:
+                    msg = build_msearch(st)
+                    self.transport.sendto(msg.encode("UTF-8"),
+                                          (SSDP_BROADCAST_ADDR, SSDP_BROADCAST_PORT))
+                    await asyncio.sleep(0)
+                await asyncio.sleep(SEND_INTERVAL_SECS)
+
+        def datagram_received(self, data, addr):
+            info = [a.split(":", 1)
+                    for a in data.decode("UTF-8").split("\r\n")[1:]]
+            device = dict([(a[0].strip().lower(), a[1].strip())
+                           for a in info if len(a) >= 2])
+            asyncio.create_task(discover.on_new_device(device['location']))
+
+        def error_received(self, exc):
+            print('Error received:', exc)
+
+        def connection_lost(self, exc):
+            print("Socket closed, stop the event loop")
+            self.is_connected = False
+            self.transport = None
+
+    return DlnaProtocol
+
+
+class DlnaDiscover(object):
+
+    def __init__(self, new_device_callback):
+        self.new_device_callback = new_device_callback
+        self.protocol = None
+        self.socket = None
+        self._pending_locations = set()
+        self._recently_seen_locations = {}  # location -> timestamp
+
+    async def on_new_device(self, location_url):
+        if not location_url:
+            return
+        # Skip if currently being processed
+        if location_url in self._pending_locations:
+            return
+        # Skip if recently seen (time-based throttle)
+        now = time.time()
+        last_seen = self._recently_seen_locations.get(location_url)
+        if last_seen is not None and (now - last_seen) < RECENTLY_SEEN_THROTTLE_SECS:
+            return
+        
+        self._pending_locations.add(location_url)
+        self._recently_seen_locations[location_url] = now
+        try:
+            await self.new_device_callback(location_url)
+        finally:
+            self._pending_locations.discard(location_url)
+
+    def init_socket(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        try:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except Exception as e:
+            print(f"socket reuse failed {e}")
+
+        self.socket.bind(("", SSDP_BROADCAST_PORT + 10))
+        self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
+
+        local_ip = guess_local_ip()
+        try:
+            if local_ip != "0.0.0.0":
+                self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(local_ip))
+                self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                                       socket.inet_aton(SSDP_BROADCAST_ADDR) + socket.inet_aton(local_ip))
+                print(f"dlna discover using local ip {local_ip}")
+            else:
+                raise ValueError("no routable local ip detected")
+        except Exception as e:
+            print(f"dlna discover set iface failed {local_ip} {e}")
+            self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                                   socket.inet_aton(SSDP_BROADCAST_ADDR) + socket.inet_aton('0.0.0.0'))
+
+        self.socket.setblocking(False)
+
+    async def discover(self, loop=None):
+        if settings.location_url is not None and len(settings.location_url) > 0:
+            await self.on_new_device(settings.location_url)
+            return
+        self.init_socket()
+        if loop is None:
+            loop = asyncio.get_running_loop()
+        await loop.create_datagram_endpoint(get_protocol(self), sock=self.socket)
