@@ -53,6 +53,8 @@ config/
 data/
 temp/
 start.sh
+.github/
+templates/
 
 # Git worktrees
 .worktrees/
