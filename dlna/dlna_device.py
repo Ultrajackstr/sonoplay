@@ -152,17 +152,17 @@ class DlnaDeviceService(object):
                 info = xml2dict(await response.text())
                 error = info.Envelope.Body.Fault.detail.UPnPError.get('errorDescription')
                 if error is not None:
-                    print(f"dlna device control request error {info.toDict()}")
+                    logger.warning("dlna device control request error: %s", info.toDict())
                     return None
                 return info.Envelope.Body.get(f"{action}Response")
         except Exception as e:
-            print(f"dlna {self.device.name} {action} control error {e.__class__.__name__} {str(e)}")
+            logger.error("dlna %s %s control error %s: %s", self.device.name, action, e.__class__.__name__, str(e))
             if "different loop" in str(e):
                 traceback.print_tb(e.__traceback__)
             if isinstance(e, ClientConnectorError):
                 self.device.repeat_error_count += 1
                 if self.device.repeat_error_count >= ERROR_COUNT_TO_REMOVE:
-                    print(f"remove device {self.device.name} due to {self.device.repeat_error_count} connection error")
+                    logger.warning("remove device %s due to %d connection errors", self.device.name, self.device.repeat_error_count)
                     if asyncio.get_running_loop() == self.device.loop:
                         asyncio.create_task(self.device.remove_self())
                     else:
@@ -175,7 +175,7 @@ class DlnaDeviceService(object):
         if settings.host_ip is None:
             settings.host_ip = guess_local_ip()
         if settings.host_ip in (None, "0.0.0.0"):
-            print("dlna subscribe no host ip")
+            logger.warning("dlna subscribe no host ip")
             return False
         if self.next_subscribe_call_time is not None:
             if datetime.now(timezone.utc) < self.next_subscribe_call_time:
@@ -188,7 +188,7 @@ class DlnaDeviceService(object):
                         + self.device.uuid + '>',
             'Timeout': f'Second-{timeout_sec}'
         }
-        print(f"sub dlna device {self.device.name} {self.service_type}")
+        logger.info("sub dlna device %s %s", self.device.name, self.service_type)
         async with g.http.request("SUBSCRIBE", self.event_url, headers=headers) as response:
             if response.ok:
                 self.next_subscribe_call_time = datetime.now(timezone.utc) + timedelta(seconds=(timeout_sec // 2))
@@ -307,7 +307,7 @@ class DlnaDevice(object):
             if not self.name or not self.uuid:
                 raise Exception(f"not valid dlna device {self.location_url}")
             if UPNP_AVT_SERVICE_TYPE not in self.services or UPNP_RC_SERVICE_TYPE not in self.services:
-                print(f"dlna device {self.name} missing required services: {list(self.services.keys())}")
+                logger.warning("dlna device %s missing required services: %s", self.name, list(self.services.keys()))
                 raise Exception(f"not valid dlna device {self.name}")
             url = urlparse(self.location_url)
             self.ip = url.hostname
@@ -359,14 +359,14 @@ class DlnaDevice(object):
                 await self.subscribe(service_type=service_type, timeout_sec=timeout_sec)
                 await asyncio.sleep(timeout_sec // 2)
             except ClientConnectorError as exc:
-                print(f"dlna {self.name} subscribe loop connection error {exc}")
+                logger.warning("dlna %s subscribe loop connection error: %s", self.name, exc)
                 if not service.subscribed:
                     break
                 await asyncio.sleep(min(timeout_sec, 15))
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                print(f"dlna {self.name} subscribe loop error {exc}")
+                logger.warning("dlna %s subscribe loop error: %s", self.name, exc)
                 if not service.subscribed:
                     break
                 await asyncio.sleep(min(timeout_sec, 10))
@@ -454,5 +454,5 @@ async def get_device_by_uuid(uuid):
     except Exception:
         # Avoid breaking physical device lookup if virtual module fails
         pass
-    print(f"device uuid not found {uuid}")
+    logger.debug("device uuid not found: %s", uuid)
     return None

@@ -173,12 +173,12 @@ class DlnaState(object):
                 self.looping_thread.join(timeout=0)
             except Exception as e:
                 logger.debug("Expected cleanup error joining thread: %s", e)
-            print(f"{self.dlna} state restarting loop thread")
+            logger.info("%s state restarting loop thread", self.dlna)
         self._thread_should_stop = False
         self.running_loop = None
         self.looping_wait_event = None
         self.change_session_lock = None
-        print(f"{self.dlna} state start looping")
+        logger.info("%s state start looping", self.dlna)
         loop_thread = Thread(target=self.background_loop,
                               name=f"Dlna State Thread {str(self.dlna)}",
                               daemon=True)
@@ -315,7 +315,7 @@ class DlnaState(object):
                 results[idx].result = r
         except Exception as e:
             if __debug__:
-                print(f"dlna {self.dlna.name} state loop error {str(e)}")
+                logger.debug("dlna %s state loop error: %s", self.dlna.name, str(e))
         self.begin_change_session()
         if position_info and position_info.result:
             position_info = position_info.result
@@ -325,7 +325,7 @@ class DlnaState(object):
                 parse_timedelta(position_info.TrackDuration).total_seconds() * 1000)
             if not state and not self._changed_state and self.state in ("TRANSITIONING", "PLAYING"):
                 if __debug__:
-                    print(f"dlna {self.dlna.name} no eplased change? retry state")
+                    logger.debug("dlna %s no elapsed change? retry state", self.dlna.name)
                 try:
                     state.result = await self.dlna.GetTransportInfo(client=client)
                 except Exception:
@@ -370,7 +370,7 @@ class DlnaState(object):
         self.looping_wait_event.clear()
 
     async def _check_loop(self):
-        print(f"state loop {self.dlna.name} begin in {current_thread().name}")
+        logger.debug("state loop %s begin in %s", self.dlna.name, current_thread().name)
         if self.change_session_lock is None:
             self.change_session_lock = asyncio.Lock()
         if self.looping_wait_event is None:
@@ -385,7 +385,7 @@ class DlnaState(object):
                 if check_count > one_batch_count:
                     check_count = 0
                 await self.wait_for_next_loop()
-        print(f"{self.dlna.name} state loop {self.dlna.name} stopped")
+        logger.debug("%s state loop stopped", self.dlna.name)
         self.running_loop = None
 
     def update(self, state: str = "", uri: str = "", position: str = ""):
@@ -417,10 +417,10 @@ class DlnaState(object):
         if self.state == state and self.current_uri == uri and self.elapsed == elapsed:
             return
         if __debug__:
-            print(f"{self.dlna.name} real update state from sub {state} {uri} {elapsed}")
+            logger.debug("%s real update state from sub %s %s %s", self.dlna.name, state, uri, elapsed)
         async with self.change_session_lock:
             if __debug__:
-                print(f"{self.dlna.name} real update state from sub in lock {state} {uri} {elapsed}")
+                logger.debug("%s real update state from sub in lock %s %s %s", self.dlna.name, state, uri, elapsed)
             self.begin_change_session()
             self.state = state
             self.current_uri = uri
@@ -439,7 +439,7 @@ class DlnaState(object):
         if self.state == state and self.current_uri == uri and self.elapsed == elapsed:
             return
         if __debug__:
-            print(f"{self.dlna.name} applying state update without loop {state} {uri} {elapsed}")
+            logger.debug("%s applying state update without loop %s %s %s", self.dlna.name, state, uri, elapsed)
         self.begin_change_session()
         self.state = state
         self.current_uri = uri
@@ -452,7 +452,7 @@ class DlnaState(object):
 class PlexDlnaAdapter(object):
 
     def __init__(self, dlna, query: QueryParams = None):
-        print(f"init adapter for {dlna} in thread {current_thread().name}")
+        logger.info("init adapter for %s in thread %s", dlna, current_thread().name)
         self.dlna = dlna
         self.plex_lib = PlexLib()
         self.plex_lib.device = self.dlna
@@ -508,13 +508,13 @@ class PlexDlnaAdapter(object):
             "current_uri": target_uri
         }
         self._suppress_auto_next = False
-        print(f"{self.dlna.name} transport operation {self._active_operation_id} started for {target_uri}")
+        logger.debug("%s transport operation %d started for %s", self.dlna.name, self._active_operation_id, target_uri)
         return self._active_operation_id
 
     def _finish_transport_operation(self, operation_id: int) -> None:
         if self._active_operation_id != operation_id:
             return
-        print(f"{self.dlna.name} transport operation {operation_id} finished")
+        logger.debug("%s transport operation %d finished", self.dlna.name, operation_id)
         # Record finish time and URI for post-operation protection
         self._last_operation_finish_time = time.monotonic()
         self._last_finished_target_uri = self._active_target_uri
@@ -566,8 +566,8 @@ class PlexDlnaAdapter(object):
         if elapsed > 5000 and duration > 0 and (duration - elapsed) > 5000:
             return False
         
-        print(f"{self.dlna.name} detected false STOP {time_since_finish:.2f}s after transport operation "
-              f"(elapsed={elapsed}ms, duration={duration}ms), triggering recovery")
+        logger.info("%s detected false STOP %.2fs after transport operation (elapsed=%dms, duration=%dms), triggering recovery",
+                    self.dlna.name, time_since_finish, elapsed, duration)
         
         # Clear the finish time to prevent infinite retry loops
         self._last_operation_finish_time = None
@@ -579,10 +579,10 @@ class PlexDlnaAdapter(object):
         async def recover_playback():
             try:
                 if self.queue is not None:
-                    print(f"{self.dlna.name} recovery: replaying current track")
+                    logger.info("%s recovery: replaying current track", self.dlna.name)
                     await self.play_selected_queue_item()
                 else:
-                    print(f"{self.dlna.name} recovery: no queue, cannot replay")
+                    logger.info("%s recovery: no queue, cannot replay", self.dlna.name)
             finally:
                 self._suppress_auto_next = False
         
@@ -637,15 +637,15 @@ class PlexDlnaAdapter(object):
                     changed.elapsed and changed.elapsed > changed.old.elapsed and
                     self.current_track_info.duration // 1000 * 1000 <= changed.elapsed <= self.current_track_info.duration):
                 self.no_notice = True
-                print(f"auto next stopped {self.state.state}, elapsed: {changed.old.elapsed} -> {changed.elapsed}, "
-                      f"{self.current_track_info.duration}")
+                logger.info("auto next stopped %s, elapsed: %s -> %s, %s",
+                            self.state.state, changed.old.elapsed, changed.elapsed, self.current_track_info.duration)
                 self.state.update(state="TRANSITIONING", uri=None)
                 asyncio.run_coroutine_threadsafe(auto_next(), self.loop)
                 self.no_notice = False
                 return True
         elif not changed.uri and changed.old.state == "PLAYING" and changed.state == "STOPPED" and self.state.current_track_duration - self.state.elapsed <= 1:
             self.no_notice = True
-            print(f"auto next transitioning {changed.old.state} {changed.state}")
+            logger.info("auto next transitioning %s %s", changed.old.state, changed.state)
             self.state.update(state="TRANSITIONING", uri=None)
             asyncio.run_coroutine_threadsafe(auto_next(), self.loop)
             self.no_notice = False
@@ -657,7 +657,7 @@ class PlexDlnaAdapter(object):
             return
         if __debug__ or 'elapsed' not in changed_state.keys() or len(changed_state.keys()) > 2 or \
                 not (0 <= changed_state.elapsed - changed_state.old.elapsed <= 1000):
-            print(f"{self.dlna.name} state change notified {changed_state.toDict()}")
+            logger.debug("%s state change notified %s", self.dlna.name, changed_state.toDict())
         if self._active_operation_id:
             if 'current_uri' in changed_state:
                 if changed_state.current_uri == self._active_target_uri:
@@ -666,10 +666,10 @@ class PlexDlnaAdapter(object):
                         self._active_operation_state_confirmed = True
                         if self._active_operation_event:
                             self._active_operation_event.set()
-                        print(f"{self.dlna.name} transport operation {self._active_operation_id} uri confirmed")
+                        logger.debug("%s transport operation %d uri confirmed", self.dlna.name, self._active_operation_id)
                         self._transport_state_override = None
                 elif changed_state.current_uri is None and changed_state.old.get('current_uri') == self._active_target_uri:
-                    print(f"{self.dlna.name} ignoring transient URI clear during active transport operation")
+                    logger.debug("%s ignoring transient URI clear during active transport operation", self.dlna.name)
                     self.state.update(uri=self._active_target_uri)
                     return
                 elif changed_state.current_uri and changed_state.current_uri != self._active_target_uri:
@@ -679,7 +679,7 @@ class PlexDlnaAdapter(object):
                         # This is a fallback in case transcoding fails or other issues occur
                         if hasattr(self, 'current_track_info') and self.current_track_info:
                             if not self.queue.is_track_playable(self.current_track_info):
-                                print(f"{self.dlna.name} device rejected track even after transcode attempt, skipping to next")
+                                logger.warning("%s device rejected track even after transcode attempt, skipping to next", self.dlna.name)
                                 # Cancel the active operation and skip to next track
                                 self._active_operation_id = None
                                 self._active_operation_event = None
@@ -687,11 +687,11 @@ class PlexDlnaAdapter(object):
                                 # Schedule next() to run in the event loop
                                 asyncio.run_coroutine_threadsafe(self.next(), self.loop)
                                 return
-                        print(f"{self.dlna.name} reverting URI {changed_state.current_uri} -> restoring target {self._active_target_uri}")
+                        logger.debug("%s reverting URI %s -> restoring target %s", self.dlna.name, changed_state.current_uri, self._active_target_uri)
                         self.state.update(uri=self._active_target_uri)
                         return
                     if __debug__:
-                        print(f"{self.dlna.name} received uri {changed_state.current_uri} while targeting {self._active_target_uri}")
+                        logger.debug("%s received uri %s while targeting %s", self.dlna.name, changed_state.current_uri, self._active_target_uri)
             if 'state' in changed_state:
                 if changed_state.state in ("PLAYING", "PAUSED_PLAYBACK"):
                     self._active_operation_state_ready = True
@@ -699,10 +699,10 @@ class PlexDlnaAdapter(object):
                         self._active_operation_state_confirmed = True
                         if self._active_operation_event:
                             self._active_operation_event.set()
-                        print(f"{self.dlna.name} transport operation {self._active_operation_id} state confirmed")
+                        logger.debug("%s transport operation %d state confirmed", self.dlna.name, self._active_operation_id)
                         self._transport_state_override = None
                 elif changed_state.state == "STOPPED" and not self._active_operation_state_confirmed:
-                    print(f"{self.dlna.name} ignoring STOP during active transport operation")
+                    logger.debug("%s ignoring STOP during active transport operation", self.dlna.name)
                     self.state.update(state="TRANSITIONING")
                     return
         # Post-operation protection: detect spurious STOPPED immediately after operation finish
@@ -803,10 +803,10 @@ class PlexDlnaAdapter(object):
             try:
                 controller.suspend_member(self, reason="solo playback request")
                 controller_adapter = adapter_by_device(controller)
-                print(f"{self.dlna.name} releasing from virtual controller {controller.name} before solo playback")
+                logger.info("%s releasing from virtual controller %s before solo playback", self.dlna.name, controller.name)
                 await controller_adapter.stop(force=True)
             except Exception as exc:
-                print(f"{self.dlna.name} failed to stop virtual controller {controller.name}: {exc}")
+                logger.warning("%s failed to stop virtual controller %s: %s", self.dlna.name, controller.name, exc)
 
         self.state.update(uri=None)
         self.queue = self.plex_lib.get_queue(container_key)
@@ -825,8 +825,9 @@ class PlexDlnaAdapter(object):
             media = track.Media[0] if hasattr(track, 'Media') and track.Media else None
             bitrate = getattr(media, 'bitrate', 'unknown') if media else 'unknown'
             sample_rate = getattr(media, 'audioSampleRate', 'unknown') if media else 'unknown'
-            print(f"{self.dlna.name} high-bitrate track detected: '{title}' by {artist} ({bitrate} kbps, {sample_rate} Hz)")
-            print(f"{self.dlna.name} using Plex transcode for Sonos compatibility")
+            logger.info("%s high-bitrate track detected: '%s' by %s (%s kbps, %s Hz)",
+                        self.dlna.name, title, artist, bitrate, sample_rate)
+            logger.info("%s using Plex transcode for Sonos compatibility", self.dlna.name)
         
         async with self._transport_lock:
             url = self.queue.url_for_track(track, force_transcode=needs_transcode)
@@ -838,13 +839,13 @@ class PlexDlnaAdapter(object):
                 while True:
                     attempt += 1
                     if attempt > 1:
-                        print(f"{self.dlna.name} retrying transport load attempt {attempt} for {url}")
+                        logger.debug("%s retrying transport load attempt %d for %s", self.dlna.name, attempt, url)
                         self._reset_active_operation_tracking()
                     await self._issue_transport_commands(url, offset=offset if attempt == 1 else 0, paused=paused)
                     settled = await self._await_transport_settle(operation_id)
                     if settled or attempt >= self._transport_max_attempts:
                         if not settled:
-                            print(f"{self.dlna.name} transport load timed out after {attempt} attempts for {url}")
+                            logger.warning("%s transport load timed out after %d attempts for %s", self.dlna.name, attempt, url)
                         break
             finally:
                 self._finish_transport_operation(operation_id)
@@ -886,9 +887,9 @@ class PlexDlnaAdapter(object):
             return True
         try:
             await asyncio.wait_for(self._active_operation_event.wait(), timeout=self._transport_settle_timeout)
-            print(f"{self.dlna.name} transport operation {operation_id} settled")
+            logger.debug("%s transport operation %d settled", self.dlna.name, operation_id)
         except asyncio.TimeoutError:
-            print(f"{self.dlna.name} transport operation {operation_id} timed out waiting for settle")
+            logger.debug("%s transport operation %d timed out waiting for settle", self.dlna.name, operation_id)
             return False
         return self._active_operation_state_confirmed and self._active_operation_id == operation_id
 
@@ -905,7 +906,7 @@ class PlexDlnaAdapter(object):
     async def stop(self, *, force: bool = False):
         controller = self.virtual_controller()
         if controller is not None and not force:
-            print(f"{self.dlna.name} stop request rerouted to virtual device {controller.name}")
+            logger.info("%s stop request rerouted to virtual device %s", self.dlna.name, controller.name)
             await controller.handle_member_stop_request(self)
             return
         async with self._transport_lock:
@@ -952,20 +953,21 @@ class PlexDlnaAdapter(object):
 
         start_offset = self.queue.start_offset
         last_offset = self.queue.last_offset if self.queue.last_offset is not None else "unknown"
-        print(f"{self.dlna.name} next diagnostics current={current_offset} last={last_offset} start={start_offset} total={total_count} direction={direction}")
+        logger.debug("%s next diagnostics current=%s last=%s start=%s total=%s direction=%s",
+                     self.dlna.name, current_offset, last_offset, start_offset, total_count, direction)
 
         if current_offset < 0:
-            print(f"{self.dlna.name} next guard stop: offset<0 current={current_offset} start={start_offset}")
+            logger.debug("%s next guard stop: offset<0 current=%s start=%s", self.dlna.name, current_offset, start_offset)
             await self.stop()
             return
         if not math.isinf(total_count) and current_offset >= total_count:
-            print(f"{self.dlna.name} next guard stop: offset>=total current={current_offset} total={total_count}")
+            logger.debug("%s next guard stop: offset>=total current=%s total=%s", self.dlna.name, current_offset, total_count)
             await self.stop()
             return
         self.state.update(state="TRANSITIONING")
-        print(f"will play position {current_offset} of {total_count}")
+        logger.debug("will play position %s of %s", current_offset, total_count)
         await self.queue.set_selected_offset(current_offset)
-        print(f"{self.dlna.name} next invoking play_selected_queue_item offset={current_offset}")
+        logger.debug("%s next invoking play_selected_queue_item offset=%s", self.dlna.name, current_offset)
         await self.play_selected_queue_item()
 
     async def skip_to_track(self, key):
@@ -1033,7 +1035,7 @@ class PlexDlnaAdapter(object):
         uri = info.AVTransportURI['@val']
         pos = info.RelativeTimePosition['@val']
         if not state and not uri and not pos:
-            print("ignoring notice no info")
+            logger.debug("ignoring notice no info")
             return
         if not state:
             state = ""
@@ -1042,7 +1044,7 @@ class PlexDlnaAdapter(object):
         if not pos:
             pos = ""
         if __debug__:
-            print(f"{self.dlna.name} update state from sub {state} {uri} {pos}")
+            logger.debug("%s update state from sub %s %s %s", self.dlna.name, state, uri, pos)
         self.state.update(state=state, uri=uri, position=pos)
 
     @property

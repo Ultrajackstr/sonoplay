@@ -1,5 +1,8 @@
 import asyncio
+import logging
 from html import escape as html_escape
+
+logger = logging.getLogger(__name__)
 
 from plex.adapters import adapter_by_device
 from utils import subscriber_send_headers, pms_header, g
@@ -85,7 +88,7 @@ class SubscribeManager(object):
             await asyncio.sleep(60)  # Run every minute
             removed = self.cleanup_stale_subscribers()
             if removed > 0:
-                print(f"Cleaned up {removed} stale subscriber(s)")
+                logger.info("Cleaned up %d stale subscriber(s)", removed)
 
     def get_subscriber(self, target_uuid: str, client_uuid: str):
         s = [s for s in self.subscribers.get(target_uuid, []) if s.uuid == client_uuid]
@@ -105,7 +108,7 @@ class SubscribeManager(object):
                        port: int,
                        protocol: str = "http",
                        command_id: int = 0):
-        print(f"add sub {client_uuid} to {target_uuid}")
+        logger.info("add sub %s to %s", client_uuid, target_uuid)
         s = self.get_subscriber(target_uuid, client_uuid)
         if s is not None:
             if s.host != host or s.port != port or s.protocol != protocol:
@@ -118,7 +121,7 @@ class SubscribeManager(object):
         self.subscribers[target_uuid] = l
 
     async def remove_subscriber(self, uuid, target_uuid: str = None):
-        print(f"remove sub {uuid} from {target_uuid}")
+        logger.info("remove sub %s from %s", uuid, target_uuid)
         for tu in [target_uuid] if target_uuid is not None else self.subscribers.keys():
             l = self.subscribers.get(tu, [])
             remove = None
@@ -149,7 +152,7 @@ class SubscribeManager(object):
         if adapter.plex_lib is None or adapter.queue is None:
             return
         if adapter.no_notice and not force:
-            print(f"ignore sub notice for server")
+            logger.debug("ignore sub notice for server")
             return
         if adapter.plex_state is None:
             return
@@ -165,7 +168,7 @@ class SubscribeManager(object):
             try:
                 res.raise_for_status()
             except Exception as e:
-                print(f"notify server error {e}, {res.content}, {params}")
+                logger.error("notify server error: %s, %s, %s", e, res.content, params)
 
     async def notify(self):
         await self.notify_server()
@@ -196,7 +199,7 @@ class SubscribeManager(object):
         subs = self.subscribers.get(device.uuid, [])
         adapter = adapter_by_device(device)
         if adapter.no_notice:
-            print(f"ignore sub notice for {adapter.dlna.name}")
+            logger.debug("ignore sub notice for %s", adapter.dlna.name)
             return
         msg = await self.msg_for_device(device)
         if msg is None:
@@ -237,7 +240,7 @@ class SubscribeManager(object):
             try:
                 await self.notify()
             except Exception as e:
-                print(f"subscribe notify error {e}")
+                logger.error("subscribe notify error: %s", e)
 
 
 class Subscriber(object):
@@ -261,7 +264,7 @@ class Subscriber(object):
                                    timeout=1) as response:
                 response.raise_for_status()
         except Exception as e:
-            print(f"subscriber send error {self} {e} {await response.text() if response is not None else 'None'}")
+            logger.warning("subscriber send error %s: %s, %s", self, e, await response.text() if response is not None else 'None')
             await self.manager.remove_subscriber(self.uuid)
 
     def __eq__(self, other):

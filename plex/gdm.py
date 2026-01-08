@@ -36,13 +36,13 @@ def get_protocol(gdm):
                     # print(f"Reply {addr}, {gdm.device.name}")
                     self.transport.sendto(msg.encode('utf8'), addr)
                 except Exception as e:
-                    print(f"unable to send client message {e}")
+                    logger.warning("unable to send client message: %s", e)
 
         def error_received(self, exc):
-            print('Error received:', exc)
+            logger.error("Error received: %s", exc)
 
         def connection_lost(self, exc):
-            print("Socket closed, stop the event loop")
+            logger.warning("Socket closed, stop the event loop")
             self.is_connected = False
             self.transport = None
 
@@ -90,7 +90,7 @@ class PlexGDM(object):
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except Exception as e:
-                print(f"socket reuse failed {e}")
+                logger.warning("socket reuse failed: %s", e)
 
             self.socket.bind(("", GDM_PORT))
             self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)

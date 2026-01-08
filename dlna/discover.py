@@ -1,6 +1,9 @@
 import asyncio
+import logging
 import socket
 import time
+
+logger = logging.getLogger(__name__)
 
 from settings import settings
 
@@ -55,7 +58,7 @@ def get_protocol(discover):
         def connection_made(self, transport):
             self.transport = transport
             self.is_connected = True
-            print("dlna discover connected")
+            logger.info("dlna discover connected")
             asyncio.create_task(self.send_loop())
 
         async def send_loop(self):
@@ -75,10 +78,10 @@ def get_protocol(discover):
             asyncio.create_task(discover.on_new_device(device['location']))
 
         def error_received(self, exc):
-            print('Error received:', exc)
+            logger.error("Error received: %s", exc)
 
         def connection_lost(self, exc):
-            print("Socket closed, stop the event loop")
+            logger.warning("Socket closed, stop the event loop")
             self.is_connected = False
             self.transport = None
 
@@ -118,7 +121,7 @@ class DlnaDiscover(object):
         try:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         except Exception as e:
-            print(f"socket reuse failed {e}")
+            logger.warning("socket reuse failed: %s", e)
 
         self.socket.bind(("", SSDP_BROADCAST_PORT + 10))
         self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
@@ -129,11 +132,11 @@ class DlnaDiscover(object):
                 self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(local_ip))
                 self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
                                        socket.inet_aton(SSDP_BROADCAST_ADDR) + socket.inet_aton(local_ip))
-                print(f"dlna discover using local ip {local_ip}")
+                logger.info("dlna discover using local ip %s", local_ip)
             else:
                 raise ValueError("no routable local ip detected")
         except Exception as e:
-            print(f"dlna discover set iface failed {local_ip} {e}")
+            logger.warning("dlna discover set iface failed %s: %s", local_ip, e)
             self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
                                    socket.inet_aton(SSDP_BROADCAST_ADDR) + socket.inet_aton('0.0.0.0'))
 

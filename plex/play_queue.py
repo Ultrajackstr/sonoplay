@@ -1,6 +1,10 @@
+import logging
+
 from dotmap import DotMap
 from starlette.datastructures import URL, QueryParams
 import math
+
+logger = logging.getLogger(__name__)
 
 from utils import g
 
@@ -44,7 +48,7 @@ class PlayQueue(object):
     async def get_info(self):
         if self.info is None:
             url = self.plex_lib.build_url(self.container_key)
-            print(f"get queue {url}")
+            logger.debug("get queue %s", url)
             async with g.http.get(url, headers=self.plex_lib.request_headers(accept_json=True)) as res:
                 res.raise_for_status()
                 self.info = DotMap((await res.json())['MediaContainer'])
@@ -56,21 +60,21 @@ class PlayQueue(object):
 
     async def refresh_queue(self, playQueueID):
         if playQueueID != self.info.playQueueID:
-            print(f"refresh to a different queue? {self.info.playQueueID} -> {playQueueID}")
+            logger.debug("refresh to a different queue? %s -> %s", self.info.playQueueID, playQueueID)
             self.container_key = str(self.container_key).replace(str(self.info.playQueueID), str(playQueueID), 1)
         old_selected_item_id = await self.selected_item_id()
         old_selected_item_offset = await self.selected_offset()
         url = self.plex_lib.build_url(self.container_key)
-        print(f"refresh queue from {url}")
+        logger.debug("refresh queue from %s", url)
         async with g.http.get(url, headers=self.plex_lib.request_headers(accept_json=True)) as res:
             res.raise_for_status()
             info = DotMap((await res.json())['MediaContainer'])
-            print(
-                "refresh queue raw selected id/offset",
+            logger.debug(
+                "refresh queue raw selected id/offset %s %s total %s metadata %s",
                 info.playQueueSelectedItemID,
                 info.playQueueSelectedItemOffset,
-                "total", info.playQueueTotalCount,
-                "metadata", len(info.Metadata)
+                info.playQueueTotalCount,
+                len(info.Metadata)
             )
             found = 0
             new_available_offset = None
@@ -87,12 +91,14 @@ class PlayQueue(object):
             if new_available_offset is None or start_offset is None:
                 raise Exception("refreshed queue has no current selected item?")
             selected_offset = new_available_offset + start_offset
-            print(
-                f"refreshed queue mapping oldOffset {old_selected_item_offset} -> {selected_offset}",
-                f"localStart {self.start_offset} -> {start_offset}",
-                f"newAvailableOffset {new_available_offset}",
-                f"rawSelectedOffset {info.playQueueSelectedItemOffset}",
-                f"rawStartOffset {start_offset}"
+            logger.debug(
+                "refreshed queue mapping oldOffset %s -> %s localStart %s -> %s "
+                "newAvailableOffset %s rawSelectedOffset %s rawStartOffset %s",
+                old_selected_item_offset, selected_offset,
+                self.start_offset, start_offset,
+                new_available_offset,
+                info.playQueueSelectedItemOffset,
+                start_offset
             )
         info.playQueueSelectedItemID = old_selected_item_id
         info.playQueueSelectedItemOffset = selected_offset
@@ -202,7 +208,7 @@ class PlayQueue(object):
             The URL string for playing the track
         """
         if force_transcode:
-            print(f"Using Plex transcode for high-bitrate track: {getattr(track, 'title', 'Unknown')}")
+            logger.info("Using Plex transcode for high-bitrate track: %s", getattr(track, 'title', 'Unknown'))
             return self.build_transcode_url(track)
         
         return self.plex_lib.build_url(track.Media[0].Part[0].key)
@@ -283,10 +289,10 @@ class PlayQueue(object):
             new_items = list(getattr(info, 'Metadata', []))
             if after:
                 self.info.Metadata += new_items
-                print(f"queue {self.container_key} append {len(new_items)} items")
+                logger.debug("queue %s append %d items", self.container_key, len(new_items))
             else:
                 self.info.Metadata = new_items + self.info.Metadata
-                print(f"queue {self.container_key} prepend {len(new_items)} items")
+                logger.debug("queue %s prepend %d items", self.container_key, len(new_items))
                 self.start_offset = max(0, self.start_offset - len(new_items))
         return len(new_items) > 0
 

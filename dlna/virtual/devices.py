@@ -235,7 +235,7 @@ class VirtualDlnaDevice:
             return
         self._suspended_member_uuids.add(member_uuid)
         note = f" ({reason})" if reason else ""
-        print(f"virtual group {self.name}: suspending member {adapter.dlna.name}{note}")
+        logger.info("virtual group %s: suspending member %s%s", self.name, adapter.dlna.name, note)
         if adapter.virtual_controller() is self:
             adapter.detach_virtual_controller(self)
         self._attached_adapters.pop(member_uuid, None)
@@ -262,16 +262,18 @@ class VirtualDlnaDevice:
 
         if method_name in ("SetAVTransportURI", "Play"):
             if self._suspended_member_uuids:
-                print(
-                    f"virtual group {self.name}: resuming {len(self._suspended_member_uuids)} suspended member(s) for {method_name}"
+                logger.info(
+                    "virtual group %s: resuming %d suspended member(s) for %s",
+                    self.name, len(self._suspended_member_uuids), method_name
                 )
             self._suspended_member_uuids.clear()
             active_devices = resolved
         else:
             active_devices = self._filter_active_devices(resolved)
             if not active_devices:
-                print(
-                    f"virtual group {self.name}: no active members available for {method_name}; skipping command"
+                logger.info(
+                    "virtual group %s: no active members available for %s; skipping command",
+                    self.name, method_name
                 )
                 return None
 
@@ -287,17 +289,19 @@ class VirtualDlnaDevice:
             # Helper to call method on a single device with logging
             async def call_member(device, method_name, *args, **kwargs):
                 method = getattr(device, method_name)
-                print(f"virtual group {self.name}: {method_name} start for member {device.name}")
+                logger.debug("virtual group %s: %s start for member %s", self.name, method_name, device.name)
                 try:
                     result = await method(*args, **kwargs)
                     summary = self._summarize_result(result)
-                    print(
-                        f"virtual group {self.name}: {method_name} success for member {device.name} -> {summary}"
+                    logger.debug(
+                        "virtual group %s: %s success for member %s -> %s",
+                        self.name, method_name, device.name, summary
                     )
                     return result
                 except Exception as exc:
-                    print(
-                        f"virtual group {self.name}: {method_name} error for member {device.name}: {exc.__class__.__name__} {exc}"
+                    logger.warning(
+                        "virtual group %s: %s error for member %s: %s %s",
+                        self.name, method_name, device.name, exc.__class__.__name__, exc
                     )
                     raise
 
@@ -338,8 +342,9 @@ class VirtualDlnaDevice:
 
     async def handle_member_stop_request(self, adapter: "PlexDlnaAdapter") -> None:
         # Ignore direct stop requests while members are under virtual control so group playback persists
-        print(
-            f"virtual group {self.name}: ignoring stop request routed from member {adapter.dlna.name}"
+        logger.debug(
+            "virtual group %s: ignoring stop request routed from member %s",
+            self.name, adapter.dlna.name
         )
 
     # ------------------------------------------------------------------
@@ -365,15 +370,16 @@ class VirtualDlnaDevice:
 
         for device, adapter in handoff_adapters:
             elapsed_ms = getattr(adapter.state, "elapsed", 0) or 0
-            print(
-                f"virtual group {self.name}: stopping solo playback on {device.name} "
-                f"before group start (elapsed={elapsed_ms}ms)"
+            logger.info(
+                "virtual group %s: stopping solo playback on %s before group start (elapsed=%dms)",
+                self.name, device.name, elapsed_ms
             )
             try:
                 await adapter.stop(force=True)
             except Exception as exc:
-                print(
-                    f"virtual group {self.name}: failed to stop {device.name} prior to group hand-off: {exc}"
+                logger.warning(
+                    "virtual group %s: failed to stop %s prior to group hand-off: %s",
+                    self.name, device.name, exc
                 )
             await asyncio.sleep(0.3)
 
@@ -412,7 +418,7 @@ class VirtualDlnaDevice:
         resolved, _ = await self._resolve_members()
         active_devices = self._filter_active_devices(resolved)
         if not active_devices:
-            print(f"virtual group {self.name}: no active members available for SetVolume; skipping command")
+            logger.info("virtual group %s: no active members available for SetVolume; skipping command", self.name)
             return True
 
         # Set flag on all member adapters to prevent them from tracking stats

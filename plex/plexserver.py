@@ -109,7 +109,7 @@ def format_ms_to_hms(ms: int):
 
 
 async def on_new_dlna_device(location_url):
-    print(f"got new dlna device location url {location_url}")
+    logger.info("got new dlna device location url %s", location_url)
     for d in devices:
         if d.location_url == location_url:
             return
@@ -117,9 +117,9 @@ async def on_new_dlna_device(location_url):
     try:
         await device.get_data()
     except Exception as exc:
-        print(f"failed to init dlna device from {location_url}: {exc}")
+        logger.warning("failed to init dlna device from %s: %s", location_url, exc)
         return
-    print(f"got new dlna device from {device.name}")
+    logger.info("got new dlna device from %s", device.name)
     asyncio.create_task(device.loop_subscribe(), name=f"dlna sub {device.name}")
     devices.append(device)
     adapter = adapter_by_device(device)
@@ -158,7 +158,7 @@ def guess_host_ip(request: Request):
         else:
             return
     settings.host_ip = host
-    print(f"guessed host ip {settings.host_ip}")
+    logger.info("guessed host ip %s", settings.host_ip)
     target_devices = list(devices)
     target_devices.extend(list_virtual_devices())
     for device in target_devices:
@@ -612,7 +612,7 @@ async def link_device(request: Request,
                         return {"status": "linked", "message": "Device appears linked (unable to verify with plex.tv)"}
             except Exception as e:
                 # Network error or similar - assume still linked
-                print(f"Error verifying device link with plex.tv: {e}")
+                logger.warning("Error verifying device link with plex.tv: %s", e)
                 return {"status": "linked", "message": "Device appears linked (unable to verify with plex.tv)"}
         
         # Device is not linked or token was invalid - generate PIN
@@ -905,7 +905,7 @@ async def resources(request: Request, target_uuid: str = Header(None, alias="x-p
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f"no device {target_uuid}")
-    print(f"resource for {device.name}")
+    logger.debug("resource for %s", device.name)
     res = "<MediaContainer>"
     res += f'<Player title="{device.name}" protocol="plex" protocolVersion="1" ' \
            f'protocolCapabilities="timeline,playback,playqueues" ' \
