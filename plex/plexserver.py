@@ -860,12 +860,12 @@ async def timeline_poll(request: Request,
                 'state', 'volume', 'current_uri', 'elapsed_jump'])
         msg = await sub_man.msg_for_device(device)
         while msg is None:
-            print(f"waiting for msg {target_uuid}")
+            logger.debug(f"Waiting for message: {target_uuid}")
             await asyncio.sleep(settings.plex_notify_interval)
             msg = await sub_man.msg_for_device(device)
         msg = msg.format(command_id=commandID)
         if datetime.now(timezone.utc) - begin_time >= timedelta(milliseconds=500):
-            print(f"{request.url} used {datetime.now(timezone.utc) - begin_time}")
+            logger.debug(f"Slow poll request: {request.url} took {datetime.now(timezone.utc) - begin_time}")
         asyncio.create_task(sub_man.notify_server_device(device, force=True))
         return await build_response(msg, device=device, headers=timeline_poll_headers(device))
     finally:
