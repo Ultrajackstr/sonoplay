@@ -830,40 +830,47 @@ async def set_parameters(commandID: int,
     return await build_response("", target_uuid=target_uuid)
 
 
-waiting_poll_count = 0
+_poll_lock = asyncio.Lock()
+_waiting_poll_count = 0
+
 @s.get("/player/timeline/poll")
 async def timeline_poll(request: Request,
                         commandID: int,
                         wait: int = 0,
                         target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                         client_uuid: str = Header(None, alias="x-plex-client-identifier")):
-    global waiting_poll_count
-    waiting_poll_count += 1
-    if waiting_poll_count > 3:
-        print(f"waiting poll {waiting_poll_count}")
-    begin_time = datetime.now(timezone.utc)
-    guess_host_ip(request)
-    sub_man.update_command_id(target_uuid, client_uuid, commandID)
-    device = await get_device_by_uuid(target_uuid)
-    if device is None:
-        raise HTTPException(404, f"device not found {target_uuid}")
-    if hasattr(device, "loop_subscribe"):
-        asyncio.create_task(device.loop_subscribe())
-    adapter = adapter_by_device(device)
-    if wait == 1:
-        await adapter.wait_for_event(settings.plex_notify_interval * 20, interesting_fields=[
-            'state', 'volume', 'current_uri', 'elapsed_jump'])
-    msg = await sub_man.msg_for_device(device)
-    while msg is None:
-        print(f"waiting for msg {target_uuid}")
-        await asyncio.sleep(settings.plex_notify_interval)
+    global _waiting_poll_count
+    async with _poll_lock:
+        _waiting_poll_count += 1
+        current_count = _waiting_poll_count
+    try:
+        if current_count > 3:
+            logger.debug(f"High poll count: {current_count}")
+        begin_time = datetime.now(timezone.utc)
+        guess_host_ip(request)
+        sub_man.update_command_id(target_uuid, client_uuid, commandID)
+        device = await get_device_by_uuid(target_uuid)
+        if device is None:
+            raise HTTPException(404, f"device not found {target_uuid}")
+        if hasattr(device, "loop_subscribe"):
+            asyncio.create_task(device.loop_subscribe())
+        adapter = adapter_by_device(device)
+        if wait == 1:
+            await adapter.wait_for_event(settings.plex_notify_interval * 20, interesting_fields=[
+                'state', 'volume', 'current_uri', 'elapsed_jump'])
         msg = await sub_man.msg_for_device(device)
-    msg = msg.format(command_id=commandID)
-    if datetime.now(timezone.utc) - begin_time >= timedelta(milliseconds=500):
-        print(f"{request.url} used {datetime.now(timezone.utc) - begin_time}")
-    waiting_poll_count -= 1
-    asyncio.create_task(sub_man.notify_server_device(device, force=True))
-    return await build_response(msg, device=device, headers=timeline_poll_headers(device))
+        while msg is None:
+            print(f"waiting for msg {target_uuid}")
+            await asyncio.sleep(settings.plex_notify_interval)
+            msg = await sub_man.msg_for_device(device)
+        msg = msg.format(command_id=commandID)
+        if datetime.now(timezone.utc) - begin_time >= timedelta(milliseconds=500):
+            print(f"{request.url} used {datetime.now(timezone.utc) - begin_time}")
+        asyncio.create_task(sub_man.notify_server_device(device, force=True))
+        return await build_response(msg, device=device, headers=timeline_poll_headers(device))
+    finally:
+        async with _poll_lock:
+            _waiting_poll_count -= 1
 
 
 @s.get("/player/timeline/subscribe")
