@@ -177,7 +177,8 @@ class DlnaState(object):
         self.change_session_lock = None
         print(f"{self.dlna} state start looping")
         loop_thread = Thread(target=self.background_loop,
-                              name=f"Dlna State Thread {str(self.dlna)}")
+                              name=f"Dlna State Thread {str(self.dlna)}",
+                              daemon=True)
         loop_thread.start()
         self.looping_thread = loop_thread
 
