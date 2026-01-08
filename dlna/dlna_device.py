@@ -18,11 +18,13 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+import asyncio
+import logging
 import re
 import traceback
-
-import asyncio
 from urllib.parse import urlparse, urljoin
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from html import escape as xml_escape
 
@@ -392,7 +394,7 @@ class DlnaDevice(object):
                     self.volume_step = int(as_text(r.get('step'), 1))
                     break
         except Exception:
-            pass
+            logger.exception("Unexpected error parsing volume range")
 
     async def remove_self(self):
         devices.remove(self)

@@ -22,7 +22,10 @@ from pydantic import BaseSettings
 from pathlib import Path
 from datetime import datetime, timezone
 import json
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def atomic_write_json(path: Path, data: dict) -> None:
@@ -50,8 +53,8 @@ def atomic_write_json(path: Path, data: dict) -> None:
         if temp_path.exists():
             try:
                 temp_path.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Expected cleanup error removing temp file: %s", e)
         raise
 
 

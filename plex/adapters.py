@@ -21,12 +21,15 @@
 
 import asyncio
 from datetime import timedelta, datetime, timezone
+import logging
 import math
 import random
 import time
 from threading import Thread, current_thread
 import weakref
 from typing import TYPE_CHECKING, Optional
+
+logger = logging.getLogger(__name__)
 
 import aiohttp
 from dotmap import DotMap
@@ -168,8 +171,8 @@ class DlnaState(object):
         if self.looping_thread is not None and not self.looping_thread.is_alive():
             try:
                 self.looping_thread.join(timeout=0)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Expected cleanup error joining thread: %s", e)
             print(f"{self.dlna} state restarting loop thread")
         self._thread_should_stop = False
         self.running_loop = None
@@ -326,7 +329,7 @@ class DlnaState(object):
                 try:
                     state.result = await self.dlna.GetTransportInfo(client=client)
                 except Exception:
-                    pass
+                    logger.exception("Unexpected error retrying GetTransportInfo")
         if state and state.result:
             state = state.result
             self.state = state.CurrentTransportState
@@ -360,8 +363,10 @@ class DlnaState(object):
     async def wait_for_next_loop(self):
         try:
             await asyncio.wait_for(self.looping_wait_event.wait(), timeout=self.loop_interval)
-        except Exception:
-            pass
+        except asyncio.TimeoutError:
+            pass  # Expected timeout for loop interval
+        except Exception as e:
+            logger.debug("Expected cleanup error during loop wait: %s", e)
         self.looping_wait_event.clear()
 
     async def _check_loop(self):
@@ -1005,7 +1010,7 @@ class PlexDlnaAdapter(object):
             try:
                 await self.update_plex_tv_connection()
             except Exception:
-                pass
+                logger.exception("Unexpected error updating Plex TV connection")
             await asyncio.sleep(60)
 
     async def update_plex_tv_connection(self):

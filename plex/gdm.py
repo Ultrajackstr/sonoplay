@@ -1,6 +1,10 @@
-import socket
-from settings import settings
 import asyncio
+import logging
+import socket
+
+from settings import settings
+
+logger = logging.getLogger(__name__)
 
 GDM_MULTICAST_ADDR = "239.0.0.250"
 GDM_MULTICAST_PORT = 32413
@@ -98,8 +102,8 @@ class PlexGDM(object):
             if self.socket:
                 try:
                     self.socket.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Expected cleanup error closing socket: %s", e)
                 self.socket = None
             raise
 
@@ -113,13 +117,13 @@ class PlexGDM(object):
         if self.protocol and getattr(self.protocol, "transport", None):
             try:
                 self.protocol.transport.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Expected cleanup error closing transport: %s", e)
         if self.socket:
             try:
                 self.socket.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Expected cleanup error closing socket: %s", e)
             self.socket = None
         self.protocol = None
 

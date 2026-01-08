@@ -11,6 +11,7 @@
 
 import asyncio
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from dotmap import DotMap  # type: ignore[import]
+
+logger = logging.getLogger(__name__)
 
 from settings import settings
 from utils import convert_volume, extract_value
@@ -906,8 +909,8 @@ async def _stop_virtual_runtime(uuid_value: str, device: Optional[VirtualDlnaDev
                 running_loop.call_soon_threadsafe(_wake)
             elif looping_event is not None:
                 looping_event.set()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Expected cleanup error during adapter wakeup: %s", e)
         adapter.queue = None
         remove_adapter(adapter)
 
@@ -917,8 +920,8 @@ async def _stop_virtual_runtime(uuid_value: str, device: Optional[VirtualDlnaDev
         try:
             await sub_man.notify_device_disconnected(device)
             await sub_man.notify_server_device(device, force=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Expected cleanup error during subscription notification: %s", e)
 
     gdm = _virtual_gdm_sessions.pop(uuid_value, None)
     if gdm is not None:
