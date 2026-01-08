@@ -43,7 +43,7 @@ from dlna import (
 )
 from typing import List, Optional, Dict, Any
 from plex.subscribe import sub_man
-from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g
+from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g, require_valid_uuid
 from settings import settings
 import asyncio
 from dlna.dlna_device import DlnaDevice
@@ -470,6 +470,7 @@ async def api_create_virtual_device(payload: VirtualDeviceCreatePayload):
 
 @s.put("/api/virtual-devices/{virtual_uuid}")
 async def api_update_virtual_device(virtual_uuid: str, payload: VirtualDeviceUpdatePayload):
+    require_valid_uuid(virtual_uuid)
     if payload.name is None and payload.member_uuids is None:
         raise HTTPException(status_code=400, detail={"message": "No changes supplied"})
     try:
@@ -485,6 +486,7 @@ async def api_update_virtual_device(virtual_uuid: str, payload: VirtualDeviceUpd
 
 @s.delete("/api/virtual-devices/{virtual_uuid}", status_code=204)
 async def api_delete_virtual_device(virtual_uuid: str):
+    require_valid_uuid(virtual_uuid)
     try:
         await delete_virtual_device(virtual_uuid)
         logger.info(f"Virtual device deleted: {virtual_uuid}")
@@ -583,6 +585,7 @@ async def link_device(request: Request,
                       pin_id: str = Form(default=None),
                       relink: str = Form(default=None),
                       check_status: str = Form(default=None)):
+    require_valid_uuid(uuid)
     device = await get_device_by_uuid(uuid)
     if device is None:
         raise HTTPException(404, f"device not found {uuid}")
@@ -652,6 +655,7 @@ async def link_device(request: Request,
 
 @s.api_route("/dlna/callback/{uuid}", methods=["NOTIFY"])
 async def dlna_subscribe(request: Request, uuid: str):
+    require_valid_uuid(uuid)
     adapter = adapter_by_device(await get_device_by_uuid(uuid))
     b = await request.body()
     info = xml2dict(b)
@@ -670,6 +674,7 @@ async def play_media(request: Request,
                      type_: str = Query("music", alias="type"),
                      target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                      client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     device = await get_device_by_uuid(target_uuid)
@@ -689,6 +694,7 @@ async def refresh_play_queue(request: Request,
                              playQueueID: int,
                              target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                              client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -703,6 +709,7 @@ async def play(commandID: int,
                type_: str = Query("music", alias="type"),
                target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -720,6 +727,7 @@ async def pause(commandID: int,
                 type_: str = Query("music", alias="type"),
                 target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                 client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -736,6 +744,7 @@ async def stop(request: Request,
                type_: str = Query("music", alias="type"),
                target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
@@ -750,6 +759,7 @@ async def next_(commandID: int,
                 type_: str = Query("music", alias="type"),
                 target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                 client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
@@ -765,6 +775,7 @@ async def prev(commandID: int,
                type_: str = Query("music", alias="type"),
                target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
@@ -781,6 +792,7 @@ async def seek(commandID: int,
                type_: str = Query("music", alias="type"),
                target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
@@ -815,6 +827,7 @@ async def set_parameters(commandID: int,
                          volume: float = None,
                          target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                          client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == 'music':
         device = await get_device_by_uuid(target_uuid)
@@ -839,6 +852,7 @@ async def timeline_poll(request: Request,
                         wait: int = 0,
                         target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                         client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     global _waiting_poll_count
     async with _poll_lock:
         _waiting_poll_count += 1
@@ -880,6 +894,7 @@ async def subscribe(request: Request,
                     protocol: str = "http",
                     target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                     client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     guess_host_ip(request)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -893,6 +908,7 @@ async def unsubscribe(request: Request,
                       commandID: int,
                       target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                       client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     await sub_man.remove_subscriber(client_uuid, target_uuid=target_uuid)
@@ -901,6 +917,7 @@ async def unsubscribe(request: Request,
 
 @s.get("/resources")
 async def resources(request: Request, target_uuid: str = Header(None, alias="x-plex-target-client-identifier")):
+    require_valid_uuid(target_uuid)
     guess_host_ip(request)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -919,6 +936,7 @@ async def resources(request: Request, target_uuid: str = Header(None, alias="x-p
 
 @s.get("/player/mirror/details")
 async def mirror(target_uuid: str = Header(None, alias="x-plex-target-client-identifier")):
+    require_valid_uuid(target_uuid)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f'device not found {target_uuid}')
