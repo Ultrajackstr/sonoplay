@@ -147,7 +147,7 @@ def _count_user_configured_devices() -> int:
     return count
 
 
-def guess_host_ip(request: Request):
+async def guess_host_ip(request: Request):
     if settings.host_ip not in (None, "0.0.0.0"):
         return
     host = request.url.hostname or ""
@@ -234,7 +234,7 @@ async def health():
     }
 @s.get("/")
 async def link_page(request: Request):
-    guess_host_ip(request)
+    await guess_host_ip(request)
     ds = []
     for d in devices:
         adapter = await adapter_by_device(d)
@@ -318,7 +318,7 @@ def _virtual_device_error_to_http(exc: Exception) -> None:
 
 @s.get("/virtual-devices")
 async def virtual_devices_page(request: Request):
-    guess_host_ip(request)
+    await guess_host_ip(request)
     return templates.TemplateResponse(
         "virtual_devices.html",
         {
@@ -498,7 +498,7 @@ async def api_delete_virtual_device(virtual_uuid: str):
 @s.get("/api/devices")
 async def api_devices(request: Request):
     """API endpoint that returns device list with extended metadata including current track info."""
-    guess_host_ip(request)
+    await guess_host_ip(request)
     devices_list = []
     
     for d in devices:
@@ -675,7 +675,7 @@ async def play_media(request: Request,
                      target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                      client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
-    guess_host_ip(request)
+    await guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
@@ -745,7 +745,7 @@ async def stop(request: Request,
                target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
-    guess_host_ip(request)
+    await guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
@@ -861,7 +861,7 @@ async def timeline_poll(request: Request,
         if current_count > 3:
             logger.debug(f"High poll count: {current_count}")
         begin_time = datetime.now(timezone.utc)
-        guess_host_ip(request)
+        await guess_host_ip(request)
         sub_man.update_command_id(target_uuid, client_uuid, commandID)
         device = await get_device_by_uuid(target_uuid)
         if device is None:
@@ -895,7 +895,7 @@ async def subscribe(request: Request,
                     target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                     client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
-    guess_host_ip(request)
+    await guess_host_ip(request)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f"device not found {target_uuid}")
@@ -909,7 +909,7 @@ async def unsubscribe(request: Request,
                       target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                       client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
-    guess_host_ip(request)
+    await guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     await sub_man.remove_subscriber(client_uuid, target_uuid=target_uuid)
     return await build_response(XML_OK, target_uuid=target_uuid)
@@ -918,7 +918,7 @@ async def unsubscribe(request: Request,
 @s.get("/resources")
 async def resources(request: Request, target_uuid: str = Header(None, alias="x-plex-target-client-identifier")):
     require_valid_uuid(target_uuid)
-    guess_host_ip(request)
+    await guess_host_ip(request)
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f"no device {target_uuid}")
