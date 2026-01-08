@@ -1,4 +1,6 @@
+# Ignore generated docs but keep plans
 docs/
+!docs/plans/
 
 # Python
 __pycache__/
