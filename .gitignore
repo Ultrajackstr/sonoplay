@@ -55,7 +55,11 @@ config/
 data/
 temp/
 start.sh
+
+# GitHub - ignore local customizations but track workflows
 .github/
+!.github/workflows/
+
 templates/
 
 # Git worktrees
