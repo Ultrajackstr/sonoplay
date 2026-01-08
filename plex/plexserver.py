@@ -122,7 +122,7 @@ async def on_new_dlna_device(location_url):
     logger.info("got new dlna device from %s", device.name)
     asyncio.create_task(device.loop_subscribe(), name=f"dlna sub {device.name}")
     devices.append(device)
-    adapter = adapter_by_device(device)
+    adapter = await adapter_by_device(device)
     settings.mark_device_status(device.uuid, "online")
     adapter.start_plex_tv_notify()
     gdm = PlexGDM(device)
@@ -162,7 +162,7 @@ def guess_host_ip(request: Request):
     target_devices = list(devices)
     target_devices.extend(list_virtual_devices())
     for device in target_devices:
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         asyncio.create_task(adapter.update_plex_tv_connection())
 
 
@@ -210,7 +210,7 @@ async def on_shutdown():
     sub_man.stop()
     stop_tasks = []
     for device in devices:
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         stop_tasks.append(adapter.stop())
         stop_tasks.append(device.remove_self())
     await asyncio.gather(*stop_tasks)
@@ -237,7 +237,7 @@ async def link_page(request: Request):
     guess_host_ip(request)
     ds = []
     for d in devices:
-        adapter = adapter_by_device(d)
+        adapter = await adapter_by_device(d)
         stats = adapter.stats_snapshot()
         play_duration = format_ms_to_hms(stats['play_duration_ms'])
         current_session = "--"
@@ -502,7 +502,7 @@ async def api_devices(request: Request):
     devices_list = []
     
     for d in devices:
-        adapter = adapter_by_device(d)
+        adapter = await adapter_by_device(d)
         stats = adapter.stats_snapshot()
         
         # Get current track info if available
@@ -589,7 +589,7 @@ async def link_device(request: Request,
     device = await get_device_by_uuid(uuid)
     if device is None:
         raise HTTPException(404, f"device not found {uuid}")
-    adapter = adapter_by_device(device)
+    adapter = await adapter_by_device(device)
     
     # Handle status check request (for "Check Link" button)
     if check_status == 'true':
@@ -656,7 +656,7 @@ async def link_device(request: Request,
 @s.api_route("/dlna/callback/{uuid}", methods=["NOTIFY"])
 async def dlna_subscribe(request: Request, uuid: str):
     require_valid_uuid(uuid)
-    adapter = adapter_by_device(await get_device_by_uuid(uuid))
+    adapter = await adapter_by_device(await get_device_by_uuid(uuid))
     b = await request.body()
     info = xml2dict(b)
     if adapter is not None:
@@ -680,7 +680,7 @@ async def play_media(request: Request,
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404)
-    adapter = adapter_by_device(device, request.query_params)
+    adapter = await adapter_by_device(device, request.query_params)
     if type_ == "music":
         await adapter.play_media(containerKey, key=key, offset=offset, paused=paused, query_params=request.query_params)
     else:
@@ -699,7 +699,7 @@ async def refresh_play_queue(request: Request,
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404)
-    adapter = adapter_by_device(device, request.query_params)
+    adapter = await adapter_by_device(device, request.query_params)
     await adapter.refresh_queue(playQueueID)
     return await build_response("", device=device)
 
@@ -714,7 +714,7 @@ async def play(commandID: int,
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404)
-    adapter = adapter_by_device(device)
+    adapter = await adapter_by_device(device)
     if type_ == "music":
         await adapter.play()
     else:
@@ -732,7 +732,7 @@ async def pause(commandID: int,
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404)
-    adapter = adapter_by_device(device)
+    adapter = await adapter_by_device(device)
     if type_ == "music":
         await adapter.pause()
     return await build_response("", device=device)
@@ -749,7 +749,7 @@ async def stop(request: Request,
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         await adapter.stop()
     return await build_response(XML_OK, target_uuid=target_uuid)
 
@@ -765,7 +765,7 @@ async def next_(commandID: int,
         device = await get_device_by_uuid(target_uuid)
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         await adapter.next()
     return await build_response("", target_uuid=target_uuid)
 
@@ -781,7 +781,7 @@ async def prev(commandID: int,
         device = await get_device_by_uuid(target_uuid)
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         await adapter.prev()
     return await build_response("", target_uuid=target_uuid)
 
@@ -798,7 +798,7 @@ async def seek(commandID: int,
         device = await get_device_by_uuid(target_uuid)
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         await adapter.seek(offset)
     return await build_response("", target_uuid=target_uuid)
 
@@ -814,7 +814,7 @@ async def skip_to(commandID: int,
         device = await get_device_by_uuid(target_uuid)
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         await adapter.skip_to_track(key)
     return await build_response("", target_uuid=target_uuid)
 
@@ -833,7 +833,7 @@ async def set_parameters(commandID: int,
         device = await get_device_by_uuid(target_uuid)
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         if shuffle is not None:
             adapter.shuffle = shuffle
         if repeat is not None:
@@ -868,7 +868,7 @@ async def timeline_poll(request: Request,
             raise HTTPException(404, f"device not found {target_uuid}")
         if hasattr(device, "loop_subscribe"):
             asyncio.create_task(device.loop_subscribe())
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         if wait == 1:
             await adapter.wait_for_event(settings.plex_notify_interval * 20, interesting_fields=[
                 'state', 'volume', 'current_uri', 'elapsed_jump'])

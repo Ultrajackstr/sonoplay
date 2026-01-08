@@ -401,7 +401,7 @@ class DlnaDevice(object):
         from plex.adapters import adapter_by_device, remove_adapter
         from plex.subscribe import sub_man
         self.stop_subscribe()
-        adapter = adapter_by_device(self)
+        adapter = await adapter_by_device(self)
         adapter.state.state = "STOPPED"
         adapter.state._wakeup_loop()
         adapter.state._thread_should_stop = True

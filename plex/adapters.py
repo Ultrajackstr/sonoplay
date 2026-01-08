@@ -43,16 +43,19 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from dlna.virtual.devices import VirtualDlnaDevice
 
 adapters = {}
+_adapters_lock = asyncio.Lock()
 
 
-def adapter_by_device(device, query_params: QueryParams = None):
-    a = adapters.get(device.uuid, None)
-    if a is None:
-        a = PlexDlnaAdapter(device, query_params)
-        adapters[device.uuid] = a
-    elif query_params is not None:
-        a.plex_lib.update(query_params)
-    return a
+async def adapter_by_device(device, query_params: QueryParams = None):
+    """Get or create adapter for device with thread-safe access."""
+    async with _adapters_lock:
+        a = adapters.get(device.uuid, None)
+        if a is None:
+            a = PlexDlnaAdapter(device, query_params)
+            adapters[device.uuid] = a
+        elif query_params is not None:
+            a.plex_lib.update(query_params)
+        return a
 
 
 def remove_adapter(adapter):

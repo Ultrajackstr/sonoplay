@@ -148,7 +148,7 @@ class SubscribeManager(object):
         subs = self.subscribers.get(device.uuid, [])
         if len(subs) == 0 and not force:
             return
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         if adapter.plex_lib is None or adapter.queue is None:
             return
         if adapter.no_notice and not force:
@@ -178,7 +178,7 @@ class SubscribeManager(object):
         await asyncio.gather(*tasks)
 
     async def msg_for_device(self, device):
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         if adapter.no_notice:
             return None
         if adapter.state.state is None or adapter.state.state == "STOPPED" or adapter.queue is None:
@@ -197,7 +197,7 @@ class SubscribeManager(object):
 
     async def notify_device(self, device):
         subs = self.subscribers.get(device.uuid, [])
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         if adapter.no_notice:
             logger.debug("ignore sub notice for %s", adapter.dlna.name)
             return
@@ -231,8 +231,11 @@ class SubscribeManager(object):
                         del self.subscribers[u]
                 if len(target_devices) == 0:
                     continue
-                await asyncio.wait([asyncio.create_task(adapter_by_device(device).wait_for_event(wait_timeout))
-                                    for device in target_devices],
+                wait_tasks = []
+                for device in target_devices:
+                    adapter = await adapter_by_device(device)
+                    wait_tasks.append(asyncio.create_task(adapter.wait_for_event(wait_timeout)))
+                await asyncio.wait(wait_tasks,
                                    timeout=wait_timeout,
                                    return_when=asyncio.FIRST_EXCEPTION)
             except asyncio.exceptions.TimeoutError:

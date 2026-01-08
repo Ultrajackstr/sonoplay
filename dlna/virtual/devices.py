@@ -199,7 +199,7 @@ class VirtualDlnaDevice:
         if not resolved:
             return None
         for device in resolved:
-            adapter = adapter_by_device(device)
+            adapter = await adapter_by_device(device)
             stats = adapter.stats_snapshot()
             if stats.get("status") in {"playing", "online"}:
                 return device
@@ -278,7 +278,9 @@ class VirtualDlnaDevice:
                 return None
 
         # Set flag on all member adapters to prevent them from tracking stats
-        member_adapters = [adapter_by_device(device) for device in active_devices]
+        member_adapters = []
+        for device in active_devices:
+            member_adapters.append(await adapter_by_device(device))
         self._ensure_control(member_adapters)
         previous_flags: List[bool] = []
         for adapter in member_adapters:
@@ -356,7 +358,9 @@ class VirtualDlnaDevice:
         # Before starting virtual device playback, force any solo-playing members to
         # stop cleanly so the upcoming group start owns transport state entirely.
         resolved, _ = await self._resolve_members()
-        member_adapters = [adapter_by_device(device) for device in resolved]
+        member_adapters = []
+        for device in resolved:
+            member_adapters.append(await adapter_by_device(device))
         self._ensure_control(member_adapters)
 
         # Identify members that appear to be actively playing on their own.
@@ -422,7 +426,9 @@ class VirtualDlnaDevice:
             return True
 
         # Set flag on all member adapters to prevent them from tracking stats
-        member_adapters = [adapter_by_device(device) for device in active_devices]
+        member_adapters = []
+        for device in active_devices:
+            member_adapters.append(await adapter_by_device(device))
         self._ensure_control(member_adapters)
         previous_flags: List[bool] = []
         for adapter in member_adapters:
@@ -492,7 +498,7 @@ class VirtualDlnaDevice:
         if not self._is_actively_playing:
             return DotMap(CurrentTransportState="STOPPED")
 
-        adapter = adapter_by_device(self)
+        adapter = await adapter_by_device(self)
         override_state = getattr(adapter, "_transport_state_override", None)
         expected_uri = self._active_target_uri
         info = await self._aggregate_first("GetTransportInfo", client=client)
@@ -538,7 +544,7 @@ class VirtualDlnaDevice:
         if not self._is_actively_playing:
             return DotMap(RelTime="00:00:00", TrackDuration="00:00:00", TrackURI="")
 
-        adapter = adapter_by_device(self)
+        adapter = await adapter_by_device(self)
         override_state = getattr(adapter, "_transport_state_override", None)
         current_uri = None
         if override_state:
@@ -612,7 +618,7 @@ class VirtualDlnaDevice:
         best_state: Optional[str] = None
         best_score = -1
         for device in active_devices:
-            adapter = adapter_by_device(device)
+            adapter = await adapter_by_device(device)
             raw_state = getattr(adapter.state, "state", None)
             if raw_state is None:
                 continue
@@ -669,7 +675,7 @@ class VirtualDlnaDevice:
         for member_uuid in self.member_uuids:
             device = resolved_map.get(member_uuid)
             if device is not None:
-                adapter = adapter_by_device(device)
+                adapter = await adapter_by_device(device)
                 stats = adapter.stats_snapshot()
                 state_value = getattr(adapter.state, "state", None)
                 normalized_state = str(state_value).upper() if state_value else None
@@ -751,7 +757,7 @@ class VirtualDlnaDevice:
 
         # Get stats ONLY from the virtual device's own adapter
         # (not from member devices - only when playing directly to virtual device)
-        virtual_adapter = adapter_by_device(self)
+        virtual_adapter = await adapter_by_device(self)
         virtual_stats = virtual_adapter.stats_snapshot()
         aggregated_play_count = virtual_stats.get("play_count", 0)
         aggregated_play_duration = virtual_stats.get("play_duration_ms", 0)
@@ -795,7 +801,7 @@ class VirtualDlnaDevice:
         # Check member devices only for Plex connection fallback (not for stats or track info)
         if plex_client is None:
             for device in resolved:
-                adapter = adapter_by_device(device)
+                adapter = await adapter_by_device(device)
                 if adapter.plex_lib and adapter.plex_lib.address:
                     plex_client = {
                         "protocol": adapter.plex_lib.protocol,
@@ -878,7 +884,7 @@ async def _ensure_virtual_runtime(device: VirtualDlnaDevice) -> None:
     adapter = adapter_registry.get(device.uuid)
     adapter_created = False
     if adapter is None:
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         adapter_created = True
     if adapter_created:
         adapter.start_plex_tv_notify()
@@ -1131,7 +1137,7 @@ async def list_physical_device_snapshots() -> List[Dict[str, Any]]:
     snapshots: List[Dict[str, Any]] = []
     for device in physical_devices:
         await device.get_data()
-        adapter = adapter_by_device(device)
+        adapter = await adapter_by_device(device)
         stats = adapter.stats_snapshot()
         status = stats.get("status", "offline")
         if status == "playing":
