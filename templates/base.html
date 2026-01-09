@@ -48,13 +48,71 @@
                     </div>
                 </div>
                 
-                <!-- Plex Status (right side) -->
-                <div class="plex-status disconnected" id="plexStatus" onclick="handlePlexClick()">
-                    <span class="plex-dot"></span>
-                    <span class="plex-text">Connect Plex</span>
+                <!-- Right side: Settings + Plex Status -->
+                <div class="nav-right" style="display: flex; align-items: center; gap: 1rem;">
+                    <!-- Settings Button -->
+                    <button class="nav-settings-btn" onclick="openSettingsModal()" title="Audio Settings" style="background: none; border: none; cursor: pointer; padding: 0.5rem; color: var(--text-secondary); font-size: 1.1rem; transition: color 0.2s;">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    
+                    <!-- Plex Status -->
+                    <div class="plex-status disconnected" id="plexStatus" onclick="handlePlexClick()">
+                        <span class="plex-dot"></span>
+                        <span class="plex-text">Connect Plex</span>
+                    </div>
                 </div>
             </div>
         </nav>
+        
+        <!-- Audio Settings Modal -->
+        <div id="settingsModal" class="settings-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+            <div class="settings-modal-content" style="background: var(--bg-primary); border-radius: 12px; padding: 2rem; max-width: 450px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 600;">Audio Settings</h2>
+                    <button onclick="closeSettingsModal()" style="background: none; border: none; cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); line-height: 1;">&times;</button>
+                </div>
+                
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">
+                    Tracks exceeding these thresholds will be transcoded for device compatibility.
+                </p>
+                
+                <!-- Bitrate Slider -->
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
+                        <span>Bitrate Limit</span>
+                        <span id="bitrateValue" style="color: var(--text-secondary);">1500 kbps</span>
+                    </label>
+                    <input type="range" id="bitrateSlider" min="0" max="6" value="4" 
+                           style="width: 100%; cursor: pointer;"
+                           oninput="updateBitrateLabel(this.value)">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.25rem;">
+                        <span>Off</span>
+                        <span>5000</span>
+                    </div>
+                </div>
+                
+                <!-- Sample Rate Slider -->
+                <div style="margin-bottom: 2rem;">
+                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
+                        <span>Sample Rate Limit</span>
+                        <span id="sampleRateValue" style="color: var(--text-secondary);">48 kHz</span>
+                    </label>
+                    <input type="range" id="sampleRateSlider" min="0" max="4" value="2"
+                           style="width: 100%; cursor: pointer;"
+                           oninput="updateSampleRateLabel(this.value)">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.25rem;">
+                        <span>Off</span>
+                        <span>192 kHz</span>
+                    </div>
+                </div>
+                
+                <!-- Save Button -->
+                <button id="saveSettingsBtn" onclick="saveAudioSettings()" 
+                        style="width: 100%; padding: 0.75rem; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 1rem;">
+                    Save Settings
+                </button>
+            </div>
+        </div>
         
         <!-- Main Content -->
         <main class="main-content">
@@ -290,6 +348,117 @@
         
         // Check Plex status on page load
         document.addEventListener('DOMContentLoaded', checkPlexStatus);
+    </script>
+    
+    <!-- Audio Settings Modal -->
+    <script>
+        // Slider value mappings
+        const bitrateStops = [0, 320, 500, 1000, 1500, 3000, 5000];
+        const sampleRateStops = [0, 44100, 48000, 96000, 192000];
+        
+        function updateBitrateLabel(index) {
+            const value = bitrateStops[index];
+            const label = document.getElementById('bitrateValue');
+            label.textContent = value === 0 ? 'Disabled' : `${value} kbps`;
+        }
+        
+        function updateSampleRateLabel(index) {
+            const value = sampleRateStops[index];
+            const label = document.getElementById('sampleRateValue');
+            if (value === 0) {
+                label.textContent = 'Disabled';
+            } else if (value >= 1000) {
+                label.textContent = `${value / 1000} kHz`;
+            } else {
+                label.textContent = `${value} Hz`;
+            }
+        }
+        
+        function findSliderIndex(value, stops) {
+            if (!value || value === 0) return 0;
+            for (let i = stops.length - 1; i >= 0; i--) {
+                if (stops[i] <= value) return i;
+            }
+            return 0;
+        }
+        
+        async function openSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.style.display = 'flex';
+            
+            // Fetch current settings
+            try {
+                const response = await fetch('/api/audio-settings');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Set slider positions
+                    const bitrateIdx = findSliderIndex(data.bitrate_kbps, bitrateStops);
+                    const sampleRateIdx = findSliderIndex(data.sample_rate_hz, sampleRateStops);
+                    
+                    document.getElementById('bitrateSlider').value = bitrateIdx;
+                    document.getElementById('sampleRateSlider').value = sampleRateIdx;
+                    
+                    updateBitrateLabel(bitrateIdx);
+                    updateSampleRateLabel(sampleRateIdx);
+                }
+            } catch (error) {
+                console.error('Failed to load audio settings:', error);
+            }
+        }
+        
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+        
+        async function saveAudioSettings() {
+            const bitrateIdx = document.getElementById('bitrateSlider').value;
+            const sampleRateIdx = document.getElementById('sampleRateSlider').value;
+            
+            const bitrate = bitrateStops[bitrateIdx];
+            const sampleRate = sampleRateStops[sampleRateIdx];
+            
+            try {
+                const response = await fetch('/api/audio-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bitrate_kbps: bitrate || null,
+                        sample_rate_hz: sampleRate || null
+                    })
+                });
+                
+                if (response.ok) {
+                    closeSettingsModal();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Settings Saved',
+                        text: 'Audio transcoding thresholds updated.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    throw new Error('Failed to save');
+                }
+            } catch (error) {
+                console.error('Failed to save audio settings:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Save Failed',
+                    text: 'Could not save audio settings. Please try again.'
+                });
+            }
+        }
+        
+        // Close modal on backdrop click
+        document.getElementById('settingsModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeSettingsModal();
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeSettingsModal();
+        });
     </script>
     
     <!-- Onboarding Wizard -->

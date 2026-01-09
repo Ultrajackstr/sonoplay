@@ -161,8 +161,8 @@
           <div class="feature-img">
             <div class="placeholder" data-label="Dashboard"></div>
           </div>
-          <h3>🔐 Easy Setup</h3>
-          <p>PIN-based Plex auth. No tokens to copy. Link your speakers in seconds.</p>
+          <h3>🔐 Automatic Transcoding</h3>
+          <p>Set bitrate and sample rate limits for your devices. Transcode on the fly to support any speaker.</p>
         </div>
       </div>
     </div>
@@ -206,11 +206,11 @@
         <button class="tab-btn" data-tab="unraid">Unraid</button>
       </div>
       <div class="tab-content active" id="tab-compose">
-        <pre><code>git clone https://github.com/aquantumofdonuts/SonoPlex.git
+        <pre><code>git clone https://github.com/aquantumofdonuts/SonoPlex.git:latest
 cd SonoPlex
 docker compose up -d
 
-# Access at http://your-server:8456</code></pre>
+# Access at http://your-server:32488</code></pre>
         <button class="copy-btn" data-target="tab-compose">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           <span>Copy</span>
@@ -222,7 +222,7 @@ docker compose up -d
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/SonoPlex</code></pre>
+  ghcr.io/aquantumofdonuts/SonoPlex:latest</code></pre>
         <button class="copy-btn" data-target="tab-run">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           <span>Copy</span>

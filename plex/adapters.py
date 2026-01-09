@@ -805,7 +805,7 @@ class PlexDlnaAdapter(object):
         if controller is not None:
             try:
                 controller.suspend_member(self, reason="solo playback request")
-                controller_adapter = adapter_by_device(controller)
+                controller_adapter = await adapter_by_device(controller)
                 logger.info("%s releasing from virtual controller %s before solo playback", self.dlna.name, controller.name)
                 await controller_adapter.stop(force=True)
             except Exception as exc:

@@ -1,0 +1,140 @@
+/* Theme Definitions */
+
+/* Default fallback (applied when no theme is set or invalid theme) */
+:root {
+    --bg-color: #0a0a0f;
+    --text-primary: #e0e0e0;
+    --text-secondary: #8888aa;
+    --glass-bg: rgba(18, 18, 26, 0.7);
+    --glass-border: rgba(0, 245, 255, 0.2);
+    --accent-color: #00f5ff;
+    --accent-gradient: linear-gradient(135deg, #00f5ff, #bf00ff);
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    --font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    --bg-image: 
+        linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+    --bg-size: 50px 50px;
+}
+
+/* 1. Neon Cyber */
+[data-theme="neon-cyber"] {
+    --bg-color: #0a0a0f;
+    --text-primary: #e0e0e0;
+    --text-secondary: #8888aa;
+    --glass-bg: rgba(18, 18, 26, 0.7);
+    --glass-border: rgba(0, 245, 255, 0.2);
+    --accent-color: #00f5ff;
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    --font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    --bg-image: 
+        linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+    --bg-size: 50px 50px;
+}
+
+/* 2. Soft Aurora */
+[data-theme="soft-aurora"] {
+    --bg-color: #faf8f5;
+    --text-primary: #2d3436;
+    --text-secondary: #636e72;
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-border: rgba(163, 182, 190, 0.3);
+    --accent-color: #88d8b0;
+    --card-shadow: 0 8px 32px 0 rgba(163, 182, 190, 0.2);
+    --font-family: 'Nunito', 'Segoe UI', sans-serif;
+    --bg-image: 
+        radial-gradient(ellipse at 0% 0%, rgba(168, 230, 207, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 0%, rgba(195, 174, 214, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(255, 211, 224, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, rgba(181, 226, 250, 0.3) 0%, transparent 50%);
+    --bg-size: cover;
+}
+
+/* 3. Midnight Luxury */
+[data-theme="midnight-luxury"] {
+    --bg-color: #050505;
+    --text-primary: #e5e5e5;
+    --text-secondary: #a1a1a1;
+    --glass-bg: rgba(20, 20, 20, 0.8);
+    --glass-border: rgba(212, 175, 55, 0.15);
+    --accent-color: #d4af37;
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    --font-family: 'Playfair Display', Georgia, serif;
+    --bg-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%);
+    --bg-size: cover;
+}
+
+/* 4. Minimal Frost */
+[data-theme="minimal-frost"] {
+    --bg-color: #f3f4f6;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --accent-color: #3b82f6;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --font-family: 'Inter', 'Segoe UI', sans-serif;
+    --bg-image: none;
+    --bg-size: auto;
+}
+
+/* 5. Retro Synthwave */
+[data-theme="retro-synthwave"] {
+    --bg-color: #2b003b;
+    --text-primary: #ffffff;
+    --text-secondary: #d4b3ff;
+    --glass-bg: rgba(43, 0, 59, 0.7);
+    --glass-border: rgba(255, 0, 255, 0.3);
+    --accent-color: #ff00ff;
+    --card-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+    --font-family: 'Press Start 2P', 'Courier New', monospace;
+    --bg-image: 
+        linear-gradient(transparent 0%, rgba(255, 0, 255, 0.2) 2%, transparent 3%),
+        linear-gradient(90deg, transparent 0%, rgba(0, 255, 255, 0.2) 2%, transparent 3%);
+    --bg-size: 40px 40px;
+}
+
+/* 6. Ocean Depth */
+[data-theme="ocean-depth"] {
+    --bg-color: #001e2b;
+    --text-primary: #e0f7fa;
+    --text-secondary: #80deea;
+    --glass-bg: rgba(0, 60, 80, 0.4);
+    --glass-border: rgba(128, 222, 234, 0.2);
+    --accent-color: #00bcd4;
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    --font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    --bg-image: radial-gradient(circle at top left, #004d40, #001e2b);
+    --bg-size: cover;
+}
+
+/* 7. Dark Matter */
+[data-theme="dark-matter"] {
+    --bg-color: #000000;
+    --text-primary: #ffffff;
+    --text-secondary: #888888;
+    --glass-bg: rgba(20, 20, 20, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --accent-color: #ffffff;
+    --card-shadow: 0 20px 50px rgba(0,0,0,0.9);
+    --font-family: 'Roboto Mono', 'Courier New', monospace;
+    --bg-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%);
+    --bg-size: cover;
+}
+
+/* 8. Warm Ember */
+[data-theme="warm-ember"] {
+    --bg-color: #1a1210;
+    --text-primary: #fff0e6;
+    --text-secondary: #ffccaa;
+    --glass-bg: rgba(40, 25, 20, 0.6);
+    --glass-border: rgba(255, 100, 50, 0.2);
+    --accent-color: #ff5500;
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    --font-family: 'Inter', 'Segoe UI', sans-serif;
+    --bg-image: 
+        radial-gradient(circle at 20% 30%, rgba(255, 80, 0, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255, 40, 0, 0.1) 0%, transparent 40%);
+    --bg-size: cover;
+}
