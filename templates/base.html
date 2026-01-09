@@ -117,17 +117,156 @@
                     }
                 });
             } else {
-                // Trigger PIN login flow
-                if (typeof startPlexLogin === 'function') {
-                    startPlexLogin();
-                } else {
-                    // Fallback: redirect to plex.tv/link
+                // Trigger PIN login flow with device picker
+                startPlexLogin();
+            }
+        }
+        
+        async function startPlexLogin() {
+            try {
+                // Fetch available devices
+                const response = await fetch('/api/devices');
+                if (!response.ok) throw new Error('Failed to fetch devices');
+                const data = await response.json();
+                const devices = data.devices || [];
+                
+                if (devices.length === 0) {
                     Swal.fire({
-                        title: 'Connect to Plex',
-                        html: 'Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a> to link your account.',
-                        icon: 'info'
+                        icon: 'warning',
+                        title: 'No Devices Found',
+                        text: 'Please wait for devices to be discovered.',
                     });
+                    return;
                 }
+                
+                // Find unlinked devices
+                const unlinkedDevices = devices.filter(d => !d.binded);
+                
+                if (unlinkedDevices.length === 0) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'All Devices Linked',
+                        text: 'All your devices are already connected to Plex.',
+                    });
+                    return;
+                }
+                
+                // If only one unlinked device, link it directly
+                let selectedDevice = unlinkedDevices[0];
+                
+                // If multiple unlinked devices, show picker
+                if (unlinkedDevices.length > 1) {
+                    const deviceOptions = {};
+                    unlinkedDevices.forEach(d => {
+                        deviceOptions[d.uuid] = d.name;
+                    });
+                    
+                    const result = await Swal.fire({
+                        title: 'Select Device to Link',
+                        input: 'select',
+                        inputOptions: deviceOptions,
+                        inputPlaceholder: 'Choose a device',
+                        showCancelButton: true,
+                        inputValidator: (value) => {
+                            if (!value) return 'Please select a device';
+                        }
+                    });
+                    
+                    if (!result.isConfirmed) return;
+                    selectedDevice = unlinkedDevices.find(d => d.uuid === result.value);
+                }
+                
+                // Request PIN for selected device
+                Swal.fire({
+                    title: 'Connecting...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                const formData = new FormData();
+                formData.append('uuid', selectedDevice.uuid);
+                formData.append('check_status', 'true');
+                
+                const pinResponse = await fetch('/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!pinResponse.ok) throw new Error('Failed to get PIN');
+                const pinData = await pinResponse.json();
+                
+                if (pinData.status === 'linked') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Already Linked!',
+                        text: `${selectedDevice.name} is connected to Plex.`,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    checkPlexStatus();
+                    return;
+                }
+                
+                if (pinData.pin) {
+                    // Show PIN and poll for authentication
+                    const pinResult = await Swal.fire({
+                        title: 'Connect to Plex',
+                        html: `
+                            <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
+                            <p style="margin-top: 1rem;">Enter this code:</p>
+                            <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${pinData.pin}</div>
+                            <p style="color: #666; font-size: 0.9rem;">Linking: ${selectedDevice.name}</p>
+                        `,
+                        confirmButtonText: 'I\'ve Entered the Code',
+                        showCancelButton: true,
+                        cancelButtonText: 'Cancel'
+                    });
+                    
+                    if (pinResult.isConfirmed) {
+                        // Check if linked
+                        Swal.fire({
+                            title: 'Checking...',
+                            allowOutsideClick: false,
+                            didOpen: () => Swal.showLoading()
+                        });
+                        
+                        const checkForm = new FormData();
+                        checkForm.append('uuid', selectedDevice.uuid);
+                        checkForm.append('pin_id', pinData.pin_id);
+                        
+                        const checkResponse = await fetch('/', {
+                            method: 'POST',
+                            body: checkForm
+                        });
+                        
+                        if (checkResponse.ok) {
+                            const checkData = await checkResponse.json();
+                            if (checkData.status === 'linked') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Connected!',
+                                    text: `${selectedDevice.name} is now linked to Plex.`,
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                                checkPlexStatus();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Not Yet Linked',
+                                    text: 'Please enter the code at plex.tv/link and try again.',
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to start Plex login:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Connection Failed',
+                    text: 'Failed to start Plex authentication. Please try again.',
+                });
             }
         }
         
@@ -361,7 +500,7 @@
             },
             
             async linkDevice(device) {
-                // Request PIN
+                // Request PIN using check_status pattern
                 Swal.fire({
                     title: 'Linking to Plex...',
                     html: 'Requesting authorization...',
@@ -370,14 +509,29 @@
                 });
                 
                 try {
+                    const formData = new FormData();
+                    formData.append('uuid', device.uuid);
+                    formData.append('check_status', 'true');
+                    
                     const pinResponse = await fetch('/', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: `action=getPin&uuid=${encodeURIComponent(device.uuid)}`
+                        body: formData
                     });
                     
                     if (!pinResponse.ok) throw new Error('Failed to get PIN');
                     const pinData = await pinResponse.json();
+                    
+                    if (pinData.status === 'linked') {
+                        device.binded = true;
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Already Linked!',
+                            text: `${device.name} is connected to Plex.`,
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                        return;
+                    }
                     
                     if (pinData.pin) {
                         // Show PIN to user
@@ -394,22 +548,25 @@
                         });
                         
                         if (pinResult.isConfirmed) {
-                            // Check if linked
+                            // Check if linked using pin_id
                             Swal.fire({
                                 title: 'Checking...',
                                 allowOutsideClick: false,
                                 didOpen: () => Swal.showLoading()
                             });
                             
+                            const checkForm = new FormData();
+                            checkForm.append('uuid', device.uuid);
+                            checkForm.append('pin_id', pinData.pin_id);
+                            
                             const checkResponse = await fetch('/', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                body: `action=checkLinked&uuid=${encodeURIComponent(device.uuid)}`
+                                body: checkForm
                             });
                             
                             if (checkResponse.ok) {
                                 const checkData = await checkResponse.json();
-                                if (checkData.binded) {
+                                if (checkData.status === 'linked') {
                                     device.binded = true;
                                     await Swal.fire({
                                         icon: 'success',
@@ -418,12 +575,26 @@
                                         timer: 1500,
                                         showConfirmButton: false
                                     });
+                                } else {
+                                    await Swal.fire({
+                                        icon: 'warning',
+                                        title: 'Not Yet Linked',
+                                        text: 'Please enter the code at plex.tv/link and try again.',
+                                        confirmButtonText: 'OK'
+                                    });
                                 }
                             }
                         }
                     }
                 } catch (error) {
                     console.error('Link failed:', error);
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Link Failed',
+                        text: 'Failed to connect to Plex. Please try again.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
                 }
             },
             

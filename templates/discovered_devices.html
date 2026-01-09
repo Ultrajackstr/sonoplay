@@ -168,78 +168,7 @@
         }
     }
 
-    // Plex Login Flow
-    async function startPlexLogin() {
-        try {
-            // Request a new PIN
-            const response = await fetch('/api/plex-pin', { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to get PIN');
-            
-            const data = await response.json();
-            const pin = data.pin;
-            const pinId = data.pin_id;
-            
-            // Show PIN to user
-            Swal.fire({
-                title: 'Connect to Plex',
-                html: `
-                    <p>Enter this code at <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>:</p>
-                    <h2 style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0.2em;">${pin}</h2>
-                    <p class="text-muted">Waiting for confirmation...</p>
-                `,
-                icon: 'info',
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                    pollForPlexAuth(pinId);
-                }
-            });
-        } catch (error) {
-            console.error('Failed to start Plex login:', error);
-            Swal.fire('Error', 'Failed to start Plex authentication', 'error');
-        }
-    }
-
-    async function pollForPlexAuth(pinId) {
-        const maxAttempts = 60; // 5 minutes at 5 second intervals
-        let attempts = 0;
-        
-        const poll = async () => {
-            try {
-                const response = await fetch(`/api/plex-pin/${pinId}`);
-                if (!response.ok) throw new Error('Poll failed');
-                
-                const data = await response.json();
-                if (data.authenticated) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Connected!',
-                        text: 'Plex account linked successfully',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                    checkPlexStatus();
-                    return;
-                }
-                
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(poll, 5000);
-                } else {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Timeout',
-                        text: 'PIN expired. Please try again.'
-                    });
-                }
-            } catch (error) {
-                console.error('Polling error:', error);
-            }
-        };
-        
-        poll();
-    }
+    // Note: startPlexLogin is defined in base.html
 
     // Device Grid Renderer
     function renderDeviceGrid(devices) {
