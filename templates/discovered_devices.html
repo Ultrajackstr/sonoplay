@@ -101,14 +101,60 @@
                     timer: 2000,
                     showConfirmButton: false
                 });
+                refreshDevices();
             } else {
-                Swal.fire({
+                // Show PIN and wait for user confirmation
+                const result = await Swal.fire({
                     icon: 'info',
-                    title: 'Link Required',
-                    html: `Link Code: <strong>${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+                    title: 'Link to Plex',
+                    html: `
+                        <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
+                        <p style="margin-top: 1rem;">Enter this code:</p>
+                        <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${data.pin}</div>
+                    `,
+                    confirmButtonText: "I've Entered the Code",
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancel'
                 });
+                
+                if (result.isConfirmed) {
+                    // Verify linking with pin_id
+                    Swal.fire({
+                        title: 'Checking...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+                    
+                    const verifyForm = new FormData();
+                    verifyForm.append('uuid', uuid);
+                    verifyForm.append('pin_id', data.pin_id);
+                    
+                    const verifyResponse = await fetch('/', {
+                        method: 'POST',
+                        body: verifyForm
+                    });
+                    
+                    if (verifyResponse.ok) {
+                        const verifyData = await verifyResponse.json();
+                        if (verifyData.status === 'linked') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Linked!',
+                                text: 'Device is now connected to Plex',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Not Yet Linked',
+                                text: 'Please enter the code at plex.tv/link and try again.'
+                            });
+                        }
+                    }
+                }
+                refreshDevices();
             }
-            refreshDevices();
         } catch (error) {
             console.error('Error checking link status:', error);
             Swal.fire('Error', 'Failed to check link status', 'error');
@@ -129,11 +175,57 @@
             if (!response.ok) throw new Error('Network response was not ok');
             
             const data = await response.json();
-            Swal.fire({
+            
+            // Show PIN and wait for user confirmation
+            const result = await Swal.fire({
                 icon: 'info',
-                title: 'Relink Required',
-                html: `New Link Code: <strong>${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+                title: 'Relink to Plex',
+                html: `
+                    <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
+                    <p style="margin-top: 1rem;">Enter this new code:</p>
+                    <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${data.pin}</div>
+                `,
+                confirmButtonText: "I've Entered the Code",
+                showCancelButton: true,
+                cancelButtonText: 'Cancel'
             });
+            
+            if (result.isConfirmed) {
+                // Verify linking with pin_id
+                Swal.fire({
+                    title: 'Checking...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                const verifyForm = new FormData();
+                verifyForm.append('uuid', uuid);
+                verifyForm.append('pin_id', data.pin_id);
+                
+                const verifyResponse = await fetch('/', {
+                    method: 'POST',
+                    body: verifyForm
+                });
+                
+                if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json();
+                    if (verifyData.status === 'linked') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Relinked!',
+                            text: 'Device is now connected to Plex',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Not Yet Linked',
+                            text: 'Please enter the code at plex.tv/link and try again.'
+                        });
+                    }
+                }
+            }
             refreshDevices();
         } catch (error) {
             console.error('Error relinking device:', error);
