@@ -153,6 +153,434 @@
         document.addEventListener('DOMContentLoaded', checkPlexStatus);
     </script>
     
+    <!-- Onboarding Wizard -->
+    <script>
+        const OnboardingWizard = {
+            devices: [],
+            selectedDevices: [],
+            groupName: 'My Speakers',
+            
+            async checkEligibility() {
+                try {
+                    const response = await fetch('/api/onboarding');
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.eligible && !data.completed) {
+                            this.start();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Onboarding check failed:', error);
+                }
+            },
+            
+            async start() {
+                await this.stepWelcome();
+            },
+            
+            // Step 1: Welcome
+            async stepWelcome() {
+                const result = await Swal.fire({
+                    title: 'Welcome to SonoPlex!',
+                    html: `
+                        <p style="margin-bottom: 1rem;">SonoPlex connects your Plex Media Server to DLNA/UPnP speakers and devices.</p>
+                        <p>Let's set up your first device in just a few steps.</p>
+                    `,
+                    icon: 'info',
+                    confirmButtonText: 'Get Started',
+                    showCancelButton: true,
+                    cancelButtonText: 'Skip Setup',
+                    allowOutsideClick: false
+                });
+                
+                if (result.isConfirmed) {
+                    await this.stepDiscoverDevices();
+                } else {
+                    await this.markComplete();
+                }
+            },
+            
+            // Step 2: Discover Devices
+            async stepDiscoverDevices() {
+                // Show loading while fetching devices
+                Swal.fire({
+                    title: 'Discovering Devices...',
+                    html: 'Scanning your network for DLNA speakers and devices.',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                try {
+                    const response = await fetch('/api/devices');
+                    if (!response.ok) throw new Error('Failed to fetch devices');
+                    const data = await response.json();
+                    this.devices = data.devices || [];
+                } catch (error) {
+                    console.error('Device discovery failed:', error);
+                    this.devices = [];
+                }
+                
+                if (this.devices.length === 0) {
+                    const result = await Swal.fire({
+                        title: 'No Devices Found',
+                        html: `
+                            <p>No DLNA devices were discovered on your network.</p>
+                            <p style="margin-top: 1rem; color: #666;">Make sure your speakers are powered on and connected to the same network.</p>
+                        `,
+                        icon: 'warning',
+                        confirmButtonText: 'Retry',
+                        showCancelButton: true,
+                        cancelButtonText: 'Finish Setup'
+                    });
+                    
+                    if (result.isConfirmed) {
+                        await this.stepDiscoverDevices();
+                    } else {
+                        await this.stepFinal();
+                    }
+                    return;
+                }
+                
+                // Display found devices
+                const deviceListHtml = this.devices.map((device, idx) => `
+                    <div class="onboarding-device" style="display: flex; align-items: center; padding: 0.75rem; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="dev-${idx}" value="${idx}" checked style="margin-right: 0.75rem; width: 18px; height: 18px;">
+                        <label for="dev-${idx}" style="flex: 1; cursor: pointer;">
+                            <div style="font-weight: 500;">${device.name}</div>
+                            <div style="font-size: 0.85rem; color: #666;">${device.location || 'DLNA Device'}</div>
+                        </label>
+                        <span style="font-size: 0.75rem; padding: 2px 8px; background: ${device.binded ? '#dcfce7' : '#fef3c7'}; color: ${device.binded ? '#166534' : '#92400e'}; border-radius: 4px;">
+                            ${device.binded ? 'Linked' : 'Not Linked'}
+                        </span>
+                    </div>
+                `).join('');
+                
+                const result = await Swal.fire({
+                    title: 'Devices Found!',
+                    html: `
+                        <p style="margin-bottom: 1rem;">Select the devices you want to set up:</p>
+                        <div style="max-height: 300px; overflow-y: auto; text-align: left;">
+                            ${deviceListHtml}
+                        </div>
+                    `,
+                    confirmButtonText: 'Continue',
+                    showCancelButton: true,
+                    cancelButtonText: 'Skip',
+                    preConfirm: () => {
+                        const checkboxes = Swal.getPopup().querySelectorAll('input[type="checkbox"]:checked');
+                        return Array.from(checkboxes).map(cb => parseInt(cb.value));
+                    }
+                });
+                
+                if (result.isConfirmed && result.value.length > 0) {
+                    this.selectedDevices = result.value.map(idx => this.devices[idx]);
+                    await this.stepConfigureDevices(0);
+                } else {
+                    await this.stepCreateGroup();
+                }
+            },
+            
+            // Step 3: Configure Each Device (Rename & Link)
+            async stepConfigureDevices(deviceIndex) {
+                if (deviceIndex >= this.selectedDevices.length) {
+                    await this.stepCreateGroup();
+                    return;
+                }
+                
+                const device = this.selectedDevices[deviceIndex];
+                const remaining = this.selectedDevices.length - deviceIndex;
+                
+                const result = await Swal.fire({
+                    title: `Configure: ${device.name}`,
+                    html: `
+                        <p style="margin-bottom: 1rem; color: #666;">Device ${deviceIndex + 1} of ${this.selectedDevices.length}</p>
+                        <div style="text-align: left; margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Device Name:</label>
+                            <input type="text" id="device-name" class="swal2-input" value="${device.name}" style="margin: 0; width: 100%;">
+                        </div>
+                        ${!device.binded ? `
+                            <div style="text-align: left; padding: 1rem; background: #fef3c7; border-radius: 8px;">
+                                <p style="margin: 0; color: #92400e;">
+                                    <strong>Link to Plex?</strong><br>
+                                    Linking allows Plex to cast directly to this device.
+                                </p>
+                            </div>
+                        ` : `
+                            <div style="text-align: left; padding: 1rem; background: #dcfce7; border-radius: 8px;">
+                                <p style="margin: 0; color: #166534;">✓ Already linked to Plex</p>
+                            </div>
+                        `}
+                    `,
+                    confirmButtonText: device.binded ? 'Save & Continue' : 'Link & Continue',
+                    showCancelButton: true,
+                    cancelButtonText: remaining > 1 ? 'Skip Device' : 'Skip',
+                    showDenyButton: !device.binded,
+                    denyButtonText: 'Save Without Linking',
+                    denyButtonColor: '#6b7280',
+                    preConfirm: () => {
+                        return {
+                            name: document.getElementById('device-name').value,
+                            link: !device.binded
+                        };
+                    },
+                    preDeny: () => {
+                        return {
+                            name: document.getElementById('device-name').value,
+                            link: false
+                        };
+                    }
+                });
+                
+                if (result.isConfirmed || result.isDenied) {
+                    const data = result.value || result.value;
+                    const newName = result.isConfirmed ? result.value.name : (result.isDenied ? document.getElementById('device-name')?.value || device.name : device.name);
+                    const shouldLink = result.isConfirmed && !device.binded;
+                    
+                    // Update device name if changed
+                    if (newName && newName !== device.name) {
+                        try {
+                            await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: `action=updateName&uuid=${encodeURIComponent(device.uuid)}&name=${encodeURIComponent(newName)}`
+                            });
+                            device.name = newName;
+                        } catch (error) {
+                            console.error('Failed to update device name:', error);
+                        }
+                    }
+                    
+                    // Link if requested
+                    if (shouldLink) {
+                        await this.linkDevice(device);
+                    }
+                }
+                
+                // Move to next device
+                await this.stepConfigureDevices(deviceIndex + 1);
+            },
+            
+            async linkDevice(device) {
+                // Request PIN
+                Swal.fire({
+                    title: 'Linking to Plex...',
+                    html: 'Requesting authorization...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                try {
+                    const pinResponse = await fetch('/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `action=getPin&uuid=${encodeURIComponent(device.uuid)}`
+                    });
+                    
+                    if (!pinResponse.ok) throw new Error('Failed to get PIN');
+                    const pinData = await pinResponse.json();
+                    
+                    if (pinData.pin) {
+                        // Show PIN to user
+                        const pinResult = await Swal.fire({
+                            title: 'Link to Plex',
+                            html: `
+                                <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
+                                <p style="margin-top: 1rem;">Enter this code:</p>
+                                <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${pinData.pin}</div>
+                            `,
+                            confirmButtonText: 'I\'ve Entered the Code',
+                            showCancelButton: true,
+                            cancelButtonText: 'Skip'
+                        });
+                        
+                        if (pinResult.isConfirmed) {
+                            // Check if linked
+                            Swal.fire({
+                                title: 'Checking...',
+                                allowOutsideClick: false,
+                                didOpen: () => Swal.showLoading()
+                            });
+                            
+                            const checkResponse = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: `action=checkLinked&uuid=${encodeURIComponent(device.uuid)}`
+                            });
+                            
+                            if (checkResponse.ok) {
+                                const checkData = await checkResponse.json();
+                                if (checkData.binded) {
+                                    device.binded = true;
+                                    await Swal.fire({
+                                        icon: 'success',
+                                        title: 'Linked!',
+                                        text: `${device.name} is now connected to Plex.`,
+                                        timer: 1500,
+                                        showConfirmButton: false
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Link failed:', error);
+                }
+            },
+            
+            // Step 4: Create Group
+            async stepCreateGroup() {
+                if (this.devices.length < 2) {
+                    // Not enough devices for a group
+                    await this.stepFinal();
+                    return;
+                }
+                
+                const result = await Swal.fire({
+                    title: 'Create a Device Group?',
+                    html: `
+                        <p style="margin-bottom: 1rem;">Groups let you play music on multiple speakers at once.</p>
+                        <div style="text-align: left; margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Group Name:</label>
+                            <input type="text" id="group-name" class="swal2-input" value="${this.groupName}" placeholder="e.g., Living Room Speakers" style="margin: 0; width: 100%;">
+                        </div>
+                        <p style="color: #666; font-size: 0.9rem;">You can create more groups later from the Groups page.</p>
+                    `,
+                    confirmButtonText: 'Create Group',
+                    showCancelButton: true,
+                    cancelButtonText: 'Skip',
+                    preConfirm: () => {
+                        return document.getElementById('group-name').value || this.groupName;
+                    }
+                });
+                
+                if (result.isConfirmed && result.value) {
+                    this.groupName = result.value;
+                    await this.stepSelectGroupDevices();
+                } else {
+                    await this.stepFinal();
+                }
+            },
+            
+            // Step 5: Select Devices for Group
+            async stepSelectGroupDevices() {
+                const deviceListHtml = this.devices.map((device, idx) => `
+                    <div style="display: flex; align-items: center; padding: 0.75rem; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="grp-dev-${idx}" value="${device.uuid}" checked style="margin-right: 0.75rem; width: 18px; height: 18px;">
+                        <label for="grp-dev-${idx}" style="flex: 1; cursor: pointer;">
+                            <div style="font-weight: 500;">${device.name}</div>
+                        </label>
+                    </div>
+                `).join('');
+                
+                const result = await Swal.fire({
+                    title: `Select Devices for "${this.groupName}"`,
+                    html: `
+                        <p style="margin-bottom: 1rem;">Choose which devices to include:</p>
+                        <div style="max-height: 250px; overflow-y: auto; text-align: left;">
+                            ${deviceListHtml}
+                        </div>
+                    `,
+                    confirmButtonText: 'Create Group',
+                    showCancelButton: true,
+                    cancelButtonText: 'Skip',
+                    preConfirm: () => {
+                        const checkboxes = Swal.getPopup().querySelectorAll('input[type="checkbox"]:checked');
+                        return Array.from(checkboxes).map(cb => cb.value);
+                    }
+                });
+                
+                if (result.isConfirmed && result.value.length >= 2) {
+                    // Create the group
+                    Swal.fire({
+                        title: 'Creating Group...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+                    
+                    try {
+                        const response = await fetch('/api/virtual-devices', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.groupName,
+                                members: result.value
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            await Swal.fire({
+                                icon: 'success',
+                                title: 'Group Created!',
+                                text: `"${this.groupName}" is ready to use.`,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Failed to create group:', error);
+                    }
+                } else if (result.isConfirmed && result.value.length < 2) {
+                    await Swal.fire({
+                        icon: 'info',
+                        title: 'Need More Devices',
+                        text: 'Groups require at least 2 devices.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+                
+                await this.stepFinal();
+            },
+            
+            // Step 6: Final Welcome
+            async stepFinal() {
+                await Swal.fire({
+                    title: 'Setup Complete!',
+                    html: `
+                        <p style="margin-bottom: 1rem;">You're all set to start streaming with SonoPlex.</p>
+                        <div style="text-align: left; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
+                            <p style="margin: 0 0 0.5rem 0;"><strong>Quick Tips:</strong></p>
+                            <ul style="margin: 0; padding-left: 1.25rem; color: #666;">
+                                <li>Open Plex and cast to your devices</li>
+                                <li>Use Groups to play on multiple speakers</li>
+                                <li>Link devices for seamless casting</li>
+                            </ul>
+                        </div>
+                    `,
+                    icon: 'success',
+                    confirmButtonText: 'Start Using SonoPlex'
+                });
+                
+                await this.markComplete();
+                
+                // Redirect to discovered devices page
+                if (window.location.pathname !== '/') {
+                    window.location.href = '/';
+                } else {
+                    // Refresh to show any changes
+                    window.location.reload();
+                }
+            },
+            
+            async markComplete() {
+                try {
+                    await fetch('/api/onboarding', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ completed: true })
+                    });
+                } catch (error) {
+                    console.error('Failed to mark onboarding complete:', error);
+                }
+            }
+        };
+        
+        // Check onboarding eligibility on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            OnboardingWizard.checkEligibility();
+        });
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>
