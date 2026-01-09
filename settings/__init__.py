@@ -18,7 +18,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from pathlib import Path
 from datetime import datetime, timezone
 import json
@@ -70,21 +70,21 @@ datastore = None
 
 
 class Settings(BaseSettings):
-    http_port = 32488
-    host_ip: str = None
-    product = "SonoPlex Player"
+    http_port: int = 32488
+    host_ip: str | None = None
+    product: str = "SonoPlex Player"
     aliases: str = ""
-    location_url: str = None
-    version = "1"
-    platform = "Linux"
-    platform_version = "1"
+    location_url: str | None = None
+    version: str = "1"
+    platform: str = "Linux"
+    platform_version: str = "1"
     client_device: str | None = None
     client_device_name: str | None = None
     client_model: str | None = None
     client_profile: str | None = None
-    plex_notify_interval = 0.5
-    config_path = "config"
-    data_file_name = "data.json"
+    plex_notify_interval: float = 0.5
+    config_path: str = "config"
+    data_file_name: str = "data.json"
     enable_onboarding_wizard: bool = False
     # Audio transcoding thresholds - exceeding these triggers Plex transcode
     # Sonos speakers typically support up to ~320kbps for network streams

@@ -78,12 +78,12 @@ logger = logging.getLogger(__name__)
 
 class VirtualDeviceCreatePayload(BaseModel):
     name: str = Field(..., min_length=1)
-    member_uuids: List[str] = Field(..., min_items=1)
+    member_uuids: List[str] = Field(..., min_length=1)
 
 
 class VirtualDeviceUpdatePayload(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1)
-    member_uuids: Optional[List[str]] = Field(default=None, min_items=1)
+    member_uuids: Optional[List[str]] = Field(default=None, min_length=1)
 
 
 class OnboardingStateUpdate(BaseModel):
