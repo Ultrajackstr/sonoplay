@@ -232,6 +232,27 @@ async def health():
         "subscribers": sum(len(subs) for subs in sub_man.subscribers.values()),
         "version": "1.0.0"
     }
+
+
+@s.get("/api/plex-status")
+async def plex_status():
+    """Check if any device is connected to Plex."""
+    # Check if any physical device has a Plex token
+    for d in devices:
+        adapter = await adapter_by_device(d)
+        if adapter.plex_bind_token is not None:
+            return {"connected": True}
+    
+    # Check if any virtual device has a Plex token
+    virtual_devs = list_virtual_devices()
+    for vd in virtual_devs:
+        token = settings.get_token_for_uuid(vd.uuid)
+        if token is not None:
+            return {"connected": True}
+    
+    return {"connected": False}
+
+
 @s.get("/")
 async def link_page(request: Request):
     await guess_host_ip(request)
