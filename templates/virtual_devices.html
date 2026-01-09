@@ -1,0 +1,907 @@
+{% extends "base.html" %}
+
+{% block title %}SonoPlex - Groups{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Group-specific styles */
+    .page-header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+    }
+    
+    @media (max-width: 768px) {
+        .page-header-actions {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .create-btn {
+            order: -1;
+        }
+    }
+    
+    /* Member list in cards */
+    .member-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        margin-top: var(--space-sm);
+    }
+    
+    .member-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: var(--radius-full);
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+    }
+    
+    .member-chip.online {
+        background: rgba(34, 197, 94, 0.1);
+        color: var(--success);
+    }
+    
+    .member-chip.offline {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+    }
+    
+    .member-chip .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+    
+    .member-chip.online .status-dot {
+        background: var(--success);
+    }
+    
+    .member-chip.offline .status-dot {
+        background: var(--danger);
+    }
+    
+    /* Group card status */
+    .group-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: var(--radius-full);
+    }
+    
+    .group-status.all-available {
+        background: rgba(34, 197, 94, 0.1);
+        color: var(--success);
+    }
+    
+    .group-status.degraded {
+        background: rgba(234, 179, 8, 0.1);
+        color: var(--warning);
+    }
+    
+    .group-status.all-offline {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+    }
+    
+    /* Card actions row */
+    .card-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-top: auto;
+        padding-top: var(--space-md);
+    }
+    
+    .card-actions .control-btn {
+        flex: 1;
+    }
+    
+    .card-actions .icon-btn {
+        flex: none;
+    }
+    
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    
+    .icon-btn:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+    
+    .icon-btn.danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+        border-color: var(--danger);
+    }
+    
+    /* Editor modal styles */
+    .editor-columns {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+    
+    @media (min-width: 600px) {
+        .editor-columns {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    
+    .editor-column-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary);
+        margin-bottom: var(--space-sm);
+    }
+    
+    .device-list {
+        max-height: 280px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-secondary);
+    }
+    
+    .device-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-sm) var(--space-md);
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s ease;
+    }
+    
+    .device-list-item:last-child {
+        border-bottom: none;
+    }
+    
+    .device-list-item:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    .device-list-item.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    
+    .device-list-info {
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .device-list-name {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .device-list-model {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .device-list-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: var(--space-sm);
+    }
+    
+    .device-list-actions button {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        font-size: 0.75rem;
+    }
+    
+    .capability-warning {
+        margin-top: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
+        background: rgba(234, 179, 8, 0.1);
+        color: var(--warning);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+    }
+    
+    .swal-input-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary);
+        margin-bottom: var(--space-xs);
+        text-align: left;
+    }
+    
+    .swal-text-input {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 0.9375rem;
+        font-family: inherit;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        transition: all 0.15s ease;
+    }
+    
+    .swal-text-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<header class="page-header">
+    <div>
+        <h1 class="page-title">Groups</h1>
+        <p class="page-subtitle" id="groupCount">Loading groups...</p>
+    </div>
+    <div class="page-header-actions">
+        <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" 
+                   id="groupSearchInput" 
+                   class="search-input" 
+                   placeholder="Search groups...">
+        </div>
+        <button class="control-btn primary create-btn" onclick="openCreateModal()">
+            <i class="fas fa-plus"></i>
+            Create Group
+        </button>
+    </div>
+</header>
+
+<!-- Group Grid -->
+<div id="groupGrid" class="device-grid">
+    <div class="loading-state" style="grid-column: 1 / -1;">
+        <div class="loading-spinner"></div>
+        <p>Loading groups...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Data cache
+    let virtualDevices = [];
+    let physicalDevices = [];
+    let selectedMembers = [];
+    let editingUuid = null;
+
+    // Utility functions
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatDuration(ms) {
+        if (!ms) return '0:00';
+        const seconds = Math.floor((ms / 1000) % 60);
+        const minutes = Math.floor((ms / (1000 * 60)) % 60);
+        const hours = Math.floor((ms / (1000 * 60 * 60)));
+        const secondsStr = seconds.toString().padStart(2, '0');
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secondsStr}`;
+        }
+        return `${minutes}:${secondsStr}`;
+    }
+
+    // API Functions
+    async function fetchGroups() {
+        try {
+            const response = await fetch('/api/virtual-devices');
+            if (!response.ok) throw new Error('Failed to load groups');
+            const data = await response.json();
+            virtualDevices = data.virtual_devices || [];
+            physicalDevices = data.physical_devices || [];
+            renderGroupGrid();
+        } catch (error) {
+            console.error('Error fetching groups:', error);
+        }
+    }
+
+    // Group Grid Renderer
+    function renderGroupGrid() {
+        const grid = document.getElementById('groupGrid');
+        const countEl = document.getElementById('groupCount');
+        const searchInput = document.getElementById('groupSearchInput');
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        if (!grid) return;
+
+        // Update count
+        if (countEl) {
+            const count = virtualDevices.length;
+            countEl.textContent = `${count} group${count !== 1 ? 's' : ''}`;
+        }
+
+        // Filter by search
+        const filteredGroups = virtualDevices.filter(group => {
+            if (!searchTerm) return true;
+            const nameMatch = (group.name || '').toLowerCase().includes(searchTerm);
+            const memberMatch = (group.members || []).some(m => 
+                (m.name || '').toLowerCase().includes(searchTerm)
+            );
+            return nameMatch || memberMatch;
+        });
+
+        // Empty state
+        if (virtualDevices.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <i class="fas fa-layer-group empty-state-icon"></i>
+                    <h3 class="empty-state-title">No groups yet</h3>
+                    <p class="empty-state-text">Create a group to sync playback across multiple devices.</p>
+                    <button class="control-btn primary" onclick="openCreateModal()" style="margin-top: var(--space-md);">
+                        <i class="fas fa-plus"></i>
+                        Create First Group
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        // No search results
+        if (filteredGroups.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <i class="fas fa-search empty-state-icon"></i>
+                    <h3 class="empty-state-title">No matches</h3>
+                    <p class="empty-state-text">No groups match your search.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Render cards
+        const html = filteredGroups.map(group => createGroupCard(group)).join('');
+        grid.innerHTML = html;
+    }
+
+    function createGroupCard(group) {
+        const members = group.members || [];
+        const onlineCount = members.filter(m => m.status === 'online' || m.status === 'playing').length;
+        const isPlaying = group.status === 'playing' || members.some(m => m.status === 'playing');
+        const isLinked = group.binded;
+        
+        // Status class
+        let statusClass = 'all-offline';
+        let statusText = 'All Offline';
+        if (group.status === 'all_available') {
+            statusClass = 'all-available';
+            statusText = 'All Online';
+        } else if (group.status === 'degraded') {
+            statusClass = 'degraded';
+            statusText = 'Partial';
+        }
+        
+        // Safe values
+        const safeName = escapeHtml(group.name || 'Unnamed Group');
+        const safeUuid = escapeHtml(group.uuid || '');
+        
+        // Members chips
+        const memberChips = members.slice(0, 5).map(m => {
+            const isOnline = m.status === 'online' || m.status === 'playing';
+            return `
+                <span class="member-chip ${isOnline ? 'online' : 'offline'}">
+                    <span class="status-dot"></span>
+                    ${escapeHtml(m.name)}
+                </span>
+            `;
+        }).join('');
+        
+        const moreCount = members.length > 5 ? members.length - 5 : 0;
+        const moreChip = moreCount > 0 ? `<span class="member-chip">+${moreCount} more</span>` : '';
+        
+        // Now Playing section
+        let nowPlayingHtml = '';
+        const track = group.current_track || {};
+        if (isPlaying && track.title) {
+            const progress = group.current_session_ms || 0;
+            const duration = track.duration || 0;
+            const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+            
+            nowPlayingHtml = `
+                <div class="now-playing">
+                    <div class="now-playing-label">Now Playing</div>
+                    <div class="now-playing-track">${escapeHtml(track.title)}</div>
+                    <div class="now-playing-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                    </div>
+                    <div class="progress-time">
+                        <span>${formatDuration(progress)}</span>
+                        <span>${formatDuration(duration)}</span>
+                    </div>
+                </div>
+                <div class="playback-controls">
+                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')">
+                        <i class="fas fa-step-backward"></i>
+                    </button>
+                    <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')">
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Action button
+        let actionButton = '';
+        if (!isLinked) {
+            actionButton = `
+                <button class="control-btn primary" onclick="event.stopPropagation(); checkLinked('${safeUuid}', '${escapeHtml(group.pin_id || '')}')">
+                    <i class="fas fa-link"></i>
+                    Link
+                </button>
+            `;
+        } else if (!isPlaying) {
+            actionButton = `
+                <button class="control-btn" onclick="event.stopPropagation(); relinkGroup('${safeUuid}')">
+                    <i class="fas fa-sync"></i>
+                    Relink
+                </button>
+            `;
+        }
+
+        return `
+            <div class="device-card ${isPlaying ? 'playing' : ''} ${isLinked && !isPlaying ? 'linked' : ''}" 
+                 onclick="showGroupDetails('${safeUuid}')">
+                <div class="device-header">
+                    <div class="device-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="device-info">
+                        <div class="device-name">${safeName}</div>
+                        <div class="device-type">${onlineCount}/${members.length} devices online</div>
+                        <div class="group-status ${statusClass}">
+                            ${statusText}
+                        </div>
+                    </div>
+                </div>
+                <div class="member-list">
+                    ${memberChips}${moreChip}
+                </div>
+                ${nowPlayingHtml}
+                <div class="card-actions">
+                    ${actionButton}
+                    <button class="icon-btn" onclick="event.stopPropagation(); openEditModal('${safeUuid}')" title="Edit">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="icon-btn danger" onclick="event.stopPropagation(); deleteGroup('${safeUuid}')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Playback Commands
+    async function sendCommand(uuid, command) {
+        try {
+            const response = await fetch(`/api/player/playback/${command}?commandID=0&type=music`, {
+                method: 'GET',
+                headers: {
+                    'X-Plex-Target-Client-Identifier': uuid,
+                    'X-Plex-Client-Identifier': 'sonoplex'
+                }
+            });
+            if (!response.ok) throw new Error('Command failed');
+            fetchGroups();
+        } catch (error) {
+            console.error('Command error:', error);
+            Swal.fire('Error', 'Failed to send command', 'error');
+        }
+    }
+
+    // Link/Relink
+    async function checkLinked(uuid, pinId = null) {
+        try {
+            const formData = new FormData();
+            formData.append('uuid', uuid);
+            if (pinId) formData.append('pin_id', pinId);
+            formData.append('check_status', 'true');
+            
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            if (data.status === 'linked') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Linked!',
+                    text: 'Group is successfully linked to Plex',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } else {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Link Required',
+                    html: `Link Code: <strong style="font-family: 'JetBrains Mono', monospace;">${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+                });
+            }
+            fetchGroups();
+        } catch (error) {
+            console.error('Error checking link status:', error);
+            Swal.fire('Error', 'Failed to check link status', 'error');
+        }
+    }
+
+    async function relinkGroup(uuid) {
+        try {
+            const formData = new FormData();
+            formData.append('uuid', uuid);
+            formData.append('relink', 'true');
+            
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            Swal.fire({
+                icon: 'info',
+                title: 'Relink Required',
+                html: `New Link Code: <strong style="font-family: 'JetBrains Mono', monospace;">${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+            });
+            fetchGroups();
+        } catch (error) {
+            console.error('Error relinking group:', error);
+            Swal.fire('Error', 'Failed to relink group', 'error');
+        }
+    }
+
+    // Group Details Modal
+    function showGroupDetails(uuid) {
+        const group = virtualDevices.find(g => g.uuid === uuid);
+        if (!group) return;
+        
+        const safeName = escapeHtml(group.name || 'Unnamed Group');
+        const members = group.members || [];
+        
+        const memberRows = members.map(m => {
+            const isOnline = m.status === 'online' || m.status === 'playing';
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <div style="font-weight: 500;">${escapeHtml(m.name)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-tertiary);">${escapeHtml(m.ip || 'Unknown IP')}</div>
+                    </div>
+                    <span class="member-chip ${isOnline ? 'online' : 'offline'}">
+                        <span class="status-dot"></span>
+                        ${isOnline ? 'Online' : 'Offline'}
+                    </span>
+                </div>
+            `;
+        }).join('');
+        
+        Swal.fire({
+            title: safeName,
+            html: `
+                <div style="text-align: left; margin-top: var(--space-md);">
+                    <div class="swal-input-label">Member Devices</div>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        ${memberRows || '<p style="color: var(--text-tertiary);">No members</p>'}
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Edit Group',
+            cancelButtonText: 'Close'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                openEditModal(uuid);
+            }
+        });
+    }
+
+    // Create/Edit Modal
+    function openCreateModal() {
+        openEditorModal(false, null);
+    }
+
+    function openEditModal(uuid) {
+        openEditorModal(true, uuid);
+    }
+
+    function openEditorModal(isEdit, uuid) {
+        editingUuid = uuid;
+        selectedMembers = [];
+        let initialName = '';
+
+        if (isEdit && uuid) {
+            const group = virtualDevices.find(g => g.uuid === uuid);
+            if (group) {
+                initialName = group.name || '';
+                selectedMembers = (group.members || []).map(m => m.uuid);
+            }
+        }
+
+        Swal.fire({
+            title: isEdit ? 'Edit Group' : 'Create Group',
+            html: `
+                <div style="text-align: left;">
+                    <div style="margin-bottom: var(--space-md);">
+                        <label class="swal-input-label">Group Name</label>
+                        <input type="text" id="swal-group-name" class="swal-text-input" placeholder="Living Room Speakers" value="${escapeHtml(initialName)}">
+                    </div>
+                    
+                    <div class="editor-columns">
+                        <div>
+                            <div class="editor-column-title">Available Devices</div>
+                            <div id="swal-available-list" class="device-list"></div>
+                        </div>
+                        <div>
+                            <div class="editor-column-title">Selected Members</div>
+                            <div id="swal-selected-list" class="device-list"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="swal-capability-warning" class="capability-warning" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Selected devices have different capabilities.
+                    </div>
+                </div>
+            `,
+            width: 700,
+            showCancelButton: true,
+            confirmButtonText: 'Save Group',
+            cancelButtonText: 'Cancel',
+            didOpen: () => {
+                renderEditorLists();
+            },
+            preConfirm: () => {
+                const name = document.getElementById('swal-group-name').value.trim();
+                if (!name) {
+                    Swal.showValidationMessage('Please enter a group name');
+                    return false;
+                }
+                if (selectedMembers.length === 0) {
+                    Swal.showValidationMessage('Please select at least one device');
+                    return false;
+                }
+                return { name, member_uuids: selectedMembers };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                saveGroup(result.value);
+            }
+        });
+    }
+
+    function renderEditorLists() {
+        const availableEl = document.getElementById('swal-available-list');
+        const selectedEl = document.getElementById('swal-selected-list');
+        
+        if (!availableEl || !selectedEl) return;
+
+        // Available devices
+        if (physicalDevices.length === 0) {
+            availableEl.innerHTML = '<div style="padding: var(--space-md); color: var(--text-tertiary); text-align: center;">No devices found</div>';
+        } else {
+            availableEl.innerHTML = physicalDevices.map(device => {
+                const isSelected = selectedMembers.includes(device.uuid);
+                return `
+                    <div class="device-list-item ${isSelected ? 'disabled' : ''}">
+                        <div class="device-list-info">
+                            <div class="device-list-name">${escapeHtml(device.name)}</div>
+                            <div class="device-list-model">${escapeHtml(device.model || 'DLNA Device')}</div>
+                        </div>
+                        <div class="device-list-actions">
+                            <button class="icon-btn" onclick="addMember('${device.uuid}')" ${isSelected ? 'disabled' : ''}>
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Selected members
+        if (selectedMembers.length === 0) {
+            selectedEl.innerHTML = '<div style="padding: var(--space-md); color: var(--text-tertiary); text-align: center;">No members selected</div>';
+        } else {
+            let mismatchFound = false;
+            const expectedHash = getExpectedCapabilityHash();
+            
+            selectedEl.innerHTML = selectedMembers.map((uuid, index) => {
+                const device = physicalDevices.find(d => d.uuid === uuid);
+                const name = device ? device.name : uuid;
+                const model = device ? device.model : '';
+                
+                let warning = '';
+                if (device && expectedHash && device.capabilities_hash !== expectedHash) {
+                    mismatchFound = true;
+                    warning = '<div style="font-size: 0.7rem; color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Mismatch</div>';
+                }
+
+                return `
+                    <div class="device-list-item">
+                        <div class="device-list-info">
+                            <div class="device-list-name">${escapeHtml(name)}</div>
+                            <div class="device-list-model">${escapeHtml(model)}</div>
+                            ${warning}
+                        </div>
+                        <div class="device-list-actions">
+                            <button class="icon-btn" onclick="moveMember('${uuid}', -1)" ${index === 0 ? 'disabled' : ''}>
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                            <button class="icon-btn" onclick="moveMember('${uuid}', 1)" ${index === selectedMembers.length - 1 ? 'disabled' : ''}>
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
+                            <button class="icon-btn danger" onclick="removeMember('${uuid}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Show/hide capability warning
+            const warningEl = document.getElementById('swal-capability-warning');
+            if (warningEl) {
+                warningEl.style.display = mismatchFound ? 'block' : 'none';
+            }
+        }
+    }
+
+    function getExpectedCapabilityHash() {
+        if (selectedMembers.length === 0) return null;
+        const first = physicalDevices.find(d => d.uuid === selectedMembers[0]);
+        return first ? first.capabilities_hash : null;
+    }
+
+    // Global functions for onclick handlers
+    window.addMember = (uuid) => {
+        if (!selectedMembers.includes(uuid)) {
+            selectedMembers.push(uuid);
+            renderEditorLists();
+        }
+    };
+
+    window.removeMember = (uuid) => {
+        const index = selectedMembers.indexOf(uuid);
+        if (index > -1) {
+            selectedMembers.splice(index, 1);
+            renderEditorLists();
+        }
+    };
+
+    window.moveMember = (uuid, direction) => {
+        const index = selectedMembers.indexOf(uuid);
+        if (index === -1) return;
+        
+        const newIndex = index + direction;
+        if (newIndex >= 0 && newIndex < selectedMembers.length) {
+            [selectedMembers[index], selectedMembers[newIndex]] = [selectedMembers[newIndex], selectedMembers[index]];
+            renderEditorLists();
+        }
+    };
+
+    async function saveGroup(data) {
+        try {
+            const url = editingUuid ? `/api/virtual-devices/${editingUuid}` : '/api/virtual-devices';
+            const method = editingUuid ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const detail = await response.json();
+                throw new Error(detail.message || 'Failed to save group');
+            }
+
+            await fetchGroups();
+            Swal.fire({
+                icon: 'success',
+                title: 'Saved',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Save Failed',
+                text: error.message
+            });
+        }
+    }
+
+    // Delete Group
+    async function deleteGroup(uuid) {
+        const result = await Swal.fire({
+            title: 'Delete Group?',
+            text: 'This action cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Delete',
+            confirmButtonColor: '#dc2626'
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const response = await fetch(`/api/virtual-devices/${uuid}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete group');
+            
+            await fetchGroups();
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Delete Failed',
+                text: error.message
+            });
+        }
+    }
+
+    // Search handler
+    document.getElementById('groupSearchInput')?.addEventListener('input', () => {
+        renderGroupGrid();
+    });
+
+    // Initial load and polling
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchGroups();
+        setInterval(fetchGroups, 5000);
+    });
+</script>
+{% endblock %}

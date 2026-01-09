@@ -287,7 +287,8 @@ async def link_page(request: Request):
         {
             'devices': ds,
             'request': request,
-            'onboarding_enabled': settings.enable_onboarding_wizard
+            'onboarding_enabled': settings.enable_onboarding_wizard,
+            'active_page': 'devices'
         }
     )
 
@@ -323,7 +324,8 @@ async def virtual_devices_page(request: Request):
         "virtual_devices.html",
         {
             "request": request,
-            "onboarding_enabled": settings.enable_onboarding_wizard
+            "onboarding_enabled": settings.enable_onboarding_wizard,
+            "active_page": "groups"
         }
     )
 
