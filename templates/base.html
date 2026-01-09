@@ -674,7 +674,7 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 name: this.groupName,
-                                members: result.value
+                                member_uuids: result.value
                             })
                         });
                         
@@ -686,9 +686,32 @@
                                 timer: 1500,
                                 showConfirmButton: false
                             });
+                        } else {
+                            // Handle API error
+                            let errorMsg = 'Failed to create group. You can try again from the Groups page.';
+                            try {
+                                const errorData = await response.json();
+                                if (errorData.detail?.message) {
+                                    errorMsg = errorData.detail.message;
+                                }
+                            } catch (e) {}
+                            await Swal.fire({
+                                icon: 'warning',
+                                title: 'Group Not Created',
+                                text: errorMsg,
+                                timer: 3000,
+                                showConfirmButton: true
+                            });
                         }
                     } catch (error) {
                         console.error('Failed to create group:', error);
+                        await Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to create group. You can try again from the Groups page.',
+                            timer: 3000,
+                            showConfirmButton: true
+                        });
                     }
                 } else if (result.isConfirmed && result.value.length < 2) {
                     await Swal.fire({
