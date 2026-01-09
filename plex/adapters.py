@@ -873,6 +873,7 @@ class PlexDlnaAdapter(object):
             self.state.update(uri=None)
         else:
             self.state.update(uri=url)
+        logger.debug("%s SetAVTransportURI: %s", self.dlna.name, url)
         await self.dlna.SetAVTransportURI(url)
         if offset != 0:
             self.state.update(position=str(timedelta(milliseconds=offset)))

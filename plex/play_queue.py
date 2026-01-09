@@ -171,28 +171,53 @@ class PlayQueue(object):
         """
         Build a Plex transcode URL that Sonos can play.
         
-        Uses Plex's universal transcode endpoint with a /fake.mp3 suffix
-        to make Sonos accept the URL (Sonos checks file extension).
+        Uses Plex's universal transcode endpoint. Requires session ID,
+        protocol, and client identifier for Plex to accept the request.
         
         Args:
             track: The track object containing ratingKey
         
         Returns:
-            URL string for transcoded audio stream (48kHz MP3)
+            URL string for transcoded audio stream
         """
         from urllib.parse import quote
+        import uuid
         
         rating_key = track.ratingKey
         
         # URL-encode the path (slashes become %2F)
         encoded_path = quote(f'/library/metadata/{rating_key}', safe='')
         
-        # Build query string manually to avoid double-encoding
-        query = f"path={encoded_path}&mediaIndex=0&partIndex=0&fastSeek=1&copyts=1&offset=0&X-Plex-Platform=Chrome"
+        # Generate a unique session ID for this transcode request
+        session_id = f"sonoplex-{uuid.uuid4().hex[:8]}"
         
-        # Build base URL with fake.mp3 suffix for Sonos compatibility
-        # Plex ignores the /fake.mp3 but Sonos needs a recognized extension
-        base_path = "/audio/:/transcode/universal/start.m3u8/fake.mp3"
+        # Get client identifier from plex_lib if available
+        client_id = getattr(self.plex_lib, 'client_identifier', None)
+        if not client_id and hasattr(self.plex_lib, 'device') and self.plex_lib.device:
+            client_id = getattr(self.plex_lib.device, 'uuid', 'sonoplex-default')
+        if not client_id:
+            client_id = 'sonoplex-default'
+        
+        # Build query with required parameters for Plex transcode
+        query_parts = [
+            f"path={encoded_path}",
+            f"session={session_id}",
+            "protocol=http",
+            "directPlay=0",
+            "directStream=0",
+            "mediaIndex=0",
+            "partIndex=0",
+            "fastSeek=1",
+            "copyts=1",
+            "offset=0",
+            "X-Plex-Platform=Chrome",
+            f"X-Plex-Client-Identifier={client_id}",
+        ]
+        query = "&".join(query_parts)
+        
+        # Build base URL - use .mp3 suffix for Sonos compatibility
+        # Sonos requires a recognized audio file extension
+        base_path = "/audio/:/transcode/universal/start.mp3"
         
         return self.plex_lib.build_url(f"{base_path}?{query}")
 
