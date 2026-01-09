@@ -72,7 +72,7 @@ datastore = None
 class Settings(BaseSettings):
     http_port = 32488
     host_ip: str = None
-    product = "Plex DLNA Player"
+    product = "SonoPlex Player"
     aliases: str = ""
     location_url: str = None
     version = "1"

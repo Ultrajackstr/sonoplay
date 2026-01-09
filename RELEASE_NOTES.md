@@ -1,10 +1,10 @@
-# Sonoplex v1.0.0 Release Notes
+# SonoPlex v1.0.0 Release Notes
 
 **Release Date:** January 4, 2026
 
 ## 🎉 Initial Release
 
-Sonoplex is a bridge that enables Plex media playback on DLNA/UPnP devices like Sonos speakers, smart TVs, and network audio receivers.
+SonoPlex is a bridge that enables Plex media playback on DLNA/UPnP devices like Sonos speakers, smart TVs, and network audio receivers.
 
 ### Features
 
@@ -52,4 +52,4 @@ Then visit `http://localhost:8456` to authenticate with Plex and start streaming
 
 ---
 
-For issues and contributions, visit the [GitHub repository](https://github.com/aquantumofdonuts/sonoplex).
+For issues and contributions, visit the [GitHub repository](https://github.com/aquantumofdonuts/SonoPlex).

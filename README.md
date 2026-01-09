@@ -1,4 +1,4 @@
-# Sonoplex
+# SonoPlex
 
 > **The missing bridge between Plexamp and your DLNA speakers**
 
@@ -20,10 +20,10 @@ The community has been asking for this for years:
 
 ## The Solution
 
-**Sonoplex makes your DLNA speakers appear as Plex players.** Cast from Plexamp to any DLNA device on your network.
+**SonoPlex makes your DLNA speakers appear as Plex players.** Cast from Plexamp to any DLNA device on your network.
 
 ```
-Plexamp → Sonoplex → Your DLNA Speakers
+Plexamp → SonoPlex → Your DLNA Speakers
 ```
 
 That's it. No complicated setup. No Raspberry Pi projects. Just works.
@@ -36,18 +36,18 @@ That's it. No complicated setup. No Raspberry Pi projects. Just works.
 
 ```bash
 docker run -d \
-  --name sonoplex \
+  --name SonoPlex \
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/sonoplex
+  ghcr.io/aquantumofdonuts/SonoPlex
 ```
 
 Or with Docker Compose:
 
 ```bash
-git clone https://github.com/aquantumofdonuts/sonoplex.git
-cd sonoplex
+git clone https://github.com/aquantumofdonuts/SonoPlex.git
+cd SonoPlex
 docker compose up -d
 ```
 
@@ -87,7 +87,7 @@ One command deployment with persistent storage and automatic restarts.
 
 ## Supported Devices
 
-Sonoplex works with any DLNA/UPnP compatible device:
+SonoPlex works with any DLNA/UPnP compatible device:
 
 - **Sonos** speakers (via DLNA mode)
 - **Yamaha** MusicCast receivers
@@ -109,7 +109,7 @@ Sonoplex works with any DLNA/UPnP compatible device:
 
 ## Configuration
 
-Sonoplex auto-detects everything. For advanced users:
+SonoPlex auto-detects everything. For advanced users:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -123,9 +123,9 @@ See [Configuration Guide](docs/CONFIGURATION.md) for more options.
 
 ## How It Works
 
-1. **Discovery**: Sonoplex uses SSDP to find DLNA devices and Plex GDM to announce them as Plex players
+1. **Discovery**: SonoPlex uses SSDP to find DLNA devices and Plex GDM to announce them as Plex players
 2. **Linking**: When you link a device to Plex.tv, Plexamp can discover it
-3. **Streaming**: Plexamp sends playback commands to Sonoplex, which translates them to DLNA control commands
+3. **Streaming**: Plexamp sends playback commands to SonoPlex, which translates them to DLNA control commands
 4. **Transcoding**: Audio is automatically transcoded to formats your device supports
 
 ---
@@ -143,11 +143,11 @@ See [Configuration Guide](docs/CONFIGURATION.md) for more options.
 ### Why can't Plexamp cast to DLNA natively?
 Plex chose not to implement DLNA casting in Plexamp. This has been a community request since 2020.
 
-### Does this replace the Plex DLNA server?
-No. Plex's DLNA server lets DLNA devices browse your library. Sonoplex does the opposite—it lets Plex apps control DLNA devices.
+### Does this replace the SonoPlex server?
+No. Plex's DLNA server lets DLNA devices browse your library. SonoPlex does the opposite—it lets Plex apps control DLNA devices.
 
 ### Do I need Plex Pass?
-Plexamp requires Plex Pass. Sonoplex itself is free and open source.
+Plexamp requires Plex Pass. SonoPlex itself is free and open source.
 
 ### What about gapless playback?
 Gapless playback depends on your DLNA device's capabilities. Most modern receivers support it.

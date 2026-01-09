@@ -1,10 +1,13 @@
 services:
-  plexdlnaplayer:
+  sonoplex:
     build: .
-    container_name: plexdlnaplayer
+    container_name: sonoplex
     network_mode: host
     restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - /usr/dockerdata/plexdlnaplayer/plexdlnaplayer/data:/config
+      - sonoplex-config:/config
+
+volumes:
+  sonoplex-config:

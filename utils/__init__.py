@@ -10,31 +10,44 @@ from datetime import timedelta, datetime
 UPNP_AVT_SERVICE_TYPE = "urn:schemas-upnp-org:service:AVTransport:1"
 UPNP_RC_SERVICE_TYPE = "urn:schemas-upnp-org:service:RenderingControl:1"
 
-# UUID validation pattern: standard UUID4 or virtual-UUID4
-# Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (32 hex digits with dashes)
-# Virtual devices: virtual-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-UUID_PATTERN = re.compile(
-    r'^(?:virtual-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+# Device identifier validation patterns
+# Accepts multiple formats used by DLNA/UPnP devices:
+# 1. Standard UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# 2. Virtual devices: virtual-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# 3. Sonos RINCON: RINCON_XXXXXXXXXXXX (hex digits, typically 17 chars)
+# 4. Generic alphanumeric device IDs (other vendors)
+DEVICE_ID_PATTERN = re.compile(
+    r'^(?:'
+    r'(?:virtual-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'  # Standard/virtual UUID
+    r'|RINCON_[0-9A-F]{12,17}'  # Sonos RINCON format
+    r'|uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'  # uuid: prefixed
+    r'|[A-Za-z0-9_-]{8,64}'  # Generic alphanumeric (other DLNA devices)
+    r')$',
     re.IGNORECASE
 )
 
+# Backward compatibility alias
+UUID_PATTERN = DEVICE_ID_PATTERN
+
 
 def is_valid_device_uuid(uuid: str | None) -> bool:
-    """Validate a device UUID format.
+    """Validate a device identifier format.
     
     Accepts:
     - Standard UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     - Virtual device format: virtual-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    - Sonos RINCON format: RINCON_XXXXXXXXXXXX
+    - Other DLNA device identifiers (alphanumeric, 8-64 chars)
     
     Args:
-        uuid: The UUID string to validate
+        uuid: The device identifier string to validate
         
     Returns:
-        True if valid UUID format, False otherwise
+        True if valid device identifier format, False otherwise
     """
     if uuid is None:
         return False
-    return bool(UUID_PATTERN.match(uuid))
+    return bool(DEVICE_ID_PATTERN.match(uuid))
 
 
 def require_valid_uuid(uuid: str | None) -> None:
