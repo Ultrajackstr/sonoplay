@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SonoPlex{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css">
+    
+    <!-- Minimal Clean Theme -->
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/minimal-clean.css') }}">
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <!-- Navigation -->
+        <nav class="nav">
+            <div class="nav-inner">
+                <!-- Brand -->
+                <a href="/" class="nav-brand">
+                    <div class="nav-brand-icon">
+                        <i class="fas fa-play"></i>
+                    </div>
+                    <span>SonoPlex</span>
+                </a>
+                
+                <!-- Center Nav Links -->
+                <div class="nav-center">
+                    <div class="nav-links">
+                        <a href="/" class="nav-link {% if active_page == 'devices' %}active{% endif %}">
+                            <i class="fas fa-broadcast-tower"></i>
+                            <span>Devices</span>
+                        </a>
+                        <a href="/virtual-devices" class="nav-link {% if active_page == 'groups' %}active{% endif %}">
+                            <i class="fas fa-layer-group"></i>
+                            <span>Groups</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Plex Status (right side) -->
+                <div class="plex-status disconnected" id="plexStatus" onclick="handlePlexClick()">
+                    <span class="plex-dot"></span>
+                    <span class="plex-text">Connect Plex</span>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    {% block modals %}{% endblock %}
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js"></script>
+    
+    <script>
+        // Plex Status Management
+        let plexConnected = false;
+        
+        async function checkPlexStatus() {
+            try {
+                const response = await fetch('/api/plex-status');
+                if (response.ok) {
+                    const data = await response.json();
+                    updatePlexUI(data.connected);
+                }
+            } catch (error) {
+                console.error('Failed to check Plex status:', error);
+            }
+        }
+        
+        function updatePlexUI(connected) {
+            plexConnected = connected;
+            const statusEl = document.getElementById('plexStatus');
+            const textEl = statusEl.querySelector('.plex-text');
+            
+            if (connected) {
+                statusEl.classList.remove('disconnected');
+                statusEl.classList.add('connected');
+                textEl.textContent = 'Plex';
+            } else {
+                statusEl.classList.remove('connected');
+                statusEl.classList.add('disconnected');
+                textEl.textContent = 'Connect Plex';
+            }
+        }
+        
+        function handlePlexClick() {
+            if (plexConnected) {
+                // Show disconnect option
+                Swal.fire({
+                    title: 'Plex Connected',
+                    text: 'Your Plex account is linked.',
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: 'OK',
+                    cancelButtonText: 'Disconnect',
+                    cancelButtonColor: '#dc2626'
+                }).then((result) => {
+                    if (result.dismiss === Swal.DismissReason.cancel) {
+                        // Handle disconnect
+                        disconnectPlex();
+                    }
+                });
+            } else {
+                // Trigger PIN login flow
+                if (typeof startPlexLogin === 'function') {
+                    startPlexLogin();
+                } else {
+                    // Fallback: redirect to plex.tv/link
+                    Swal.fire({
+                        title: 'Connect to Plex',
+                        html: 'Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a> to link your account.',
+                        icon: 'info'
+                    });
+                }
+            }
+        }
+        
+        async function disconnectPlex() {
+            try {
+                const response = await fetch('/api/plex-disconnect', { method: 'POST' });
+                if (response.ok) {
+                    updatePlexUI(false);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Disconnected',
+                        text: 'Plex account has been unlinked.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to disconnect Plex:', error);
+            }
+        }
+        
+        // Check Plex status on page load
+        document.addEventListener('DOMContentLoaded', checkPlexStatus);
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
