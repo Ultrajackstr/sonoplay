@@ -38,21 +38,15 @@ dev = [
     "httpx>=0.24.0",
 ]
 
-[project.scripts]
-sonoplex = "sonoplex.__main__:main"
-
 [project.urls]
 Homepage = "https://github.com/aquantumofdonuts/sonoplex"
 Repository = "https://github.com/aquantumofdonuts/sonoplex"
 Issues = "https://github.com/aquantumofdonuts/sonoplex/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-pythonpath = ["src", "."]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 120
