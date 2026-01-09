@@ -60,8 +60,6 @@ start.sh
 .github/
 !.github/workflows/
 
-templates/
-
 # Git worktrees
 .worktrees/
 
