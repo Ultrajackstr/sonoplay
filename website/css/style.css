@@ -326,8 +326,8 @@ img {
 }
 
 .hero-slider {
-  max-width: 800px;
-  margin: 0 auto 2rem;
+  max-width: 560px;
+  margin: 0 auto 1.5rem;
   position: relative;
 }
 
@@ -349,6 +349,8 @@ img {
 .hero-slide img,
 .hero-slide .placeholder {
   width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
   border-radius: 12px;
 }
 
