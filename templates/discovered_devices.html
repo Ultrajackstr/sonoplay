@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}SonoPlex - Devices{% endblock %}
+
+{% block extra_head %}
+<!-- Day.js for time formatting -->
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/duration.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/relativeTime.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<header class="page-header">
+    <div>
+        <h1 class="page-title">Discovered Devices</h1>
+        <p class="page-subtitle" id="deviceCount">Scanning for devices...</p>
+    </div>
+    <div class="search-box">
+        <i class="fas fa-search search-icon"></i>
+        <input type="text" 
+               id="deviceSearchInput" 
+               class="search-input" 
+               placeholder="Search devices...">
+    </div>
+</header>
+
+<!-- Device Grid -->
+<div id="devicesList" class="device-grid">
+    <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Scanning for devices...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Day.js plugins
+    dayjs.extend(window.dayjs_plugin_duration);
+    dayjs.extend(window.dayjs_plugin_relativeTime);
+
+    // Device cache
+    let lastFetchedDevices = [];
+
+    // Utility functions
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatDuration(ms) {
+        if (!ms) return '0:00';
+        const seconds = Math.floor((ms / 1000) % 60);
+        const minutes = Math.floor((ms / (1000 * 60)) % 60);
+        const hours = Math.floor((ms / (1000 * 60 * 60)));
+        const secondsStr = seconds.toString().padStart(2, '0');
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secondsStr}`;
+        }
+        return `${minutes}:${secondsStr}`;
+    }
+
+    // API Functions
+    async function fetchDevices() {
+        try {
+            const response = await fetch('/api/devices');
+            const data = await response.json();
+            return data.devices || [];
+        } catch (error) {
+            console.error('Error fetching devices:', error);
+            return [];
+        }
+    }
+
+    async function checkLinked(uuid, pinId = null) {
+        try {
+            const formData = new FormData();
+            formData.append('uuid', uuid);
+            if (pinId) formData.append('pin_id', pinId);
+            formData.append('check_status', 'true');
+            
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            if (data.status === 'linked') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Linked!',
+                    text: 'Device is successfully linked to Plex',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } else {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Link Required',
+                    html: `Link Code: <strong>${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+                });
+            }
+            refreshDevices();
+        } catch (error) {
+            console.error('Error checking link status:', error);
+            Swal.fire('Error', 'Failed to check link status', 'error');
+        }
+    }
+
+    async function relinkDevice(uuid) {
+        try {
+            const formData = new FormData();
+            formData.append('uuid', uuid);
+            formData.append('relink', 'true');
+            
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            Swal.fire({
+                icon: 'info',
+                title: 'Relink Required',
+                html: `New Link Code: <strong>${data.pin}</strong><br>Visit <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>`,
+            });
+            refreshDevices();
+        } catch (error) {
+            console.error('Error relinking device:', error);
+            Swal.fire('Error', 'Failed to relink device', 'error');
+        }
+    }
+
+    async function updateDeviceName(uuid, name) {
+        try {
+            const formData = new FormData();
+            formData.append('uuid', uuid);
+            formData.append('name', name);
+            
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Unexpected response');
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Name Updated',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            return true;
+        } catch (error) {
+            console.error('Error updating device name:', error);
+            Swal.fire('Error', 'Failed to update device name', 'error');
+            throw error;
+        }
+    }
+
+    // Plex Login Flow
+    async function startPlexLogin() {
+        try {
+            // Request a new PIN
+            const response = await fetch('/api/plex-pin', { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to get PIN');
+            
+            const data = await response.json();
+            const pin = data.pin;
+            const pinId = data.pin_id;
+            
+            // Show PIN to user
+            Swal.fire({
+                title: 'Connect to Plex',
+                html: `
+                    <p>Enter this code at <a href="https://plex.tv/link" target="_blank">plex.tv/link</a>:</p>
+                    <h2 style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0.2em;">${pin}</h2>
+                    <p class="text-muted">Waiting for confirmation...</p>
+                `,
+                icon: 'info',
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                    pollForPlexAuth(pinId);
+                }
+            });
+        } catch (error) {
+            console.error('Failed to start Plex login:', error);
+            Swal.fire('Error', 'Failed to start Plex authentication', 'error');
+        }
+    }
+
+    async function pollForPlexAuth(pinId) {
+        const maxAttempts = 60; // 5 minutes at 5 second intervals
+        let attempts = 0;
+        
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/plex-pin/${pinId}`);
+                if (!response.ok) throw new Error('Poll failed');
+                
+                const data = await response.json();
+                if (data.authenticated) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Connected!',
+                        text: 'Plex account linked successfully',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    checkPlexStatus();
+                    return;
+                }
+                
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(poll, 5000);
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Timeout',
+                        text: 'PIN expired. Please try again.'
+                    });
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        };
+        
+        poll();
+    }
+
+    // Device Grid Renderer
+    function renderDeviceGrid(devices) {
+        const grid = document.getElementById('devicesList');
+        const countEl = document.getElementById('deviceCount');
+        if (!grid) return;
+
+        // Update count
+        if (countEl) {
+            const count = devices ? devices.length : 0;
+            countEl.textContent = `${count} device${count !== 1 ? 's' : ''} on your network`;
+        }
+
+        // Empty state
+        if (!devices || devices.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <i class="fas fa-broadcast-tower empty-state-icon"></i>
+                    <h3 class="empty-state-title">No devices found</h3>
+                    <p class="empty-state-text">Make sure your DLNA devices are powered on and connected to the network.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Render cards
+        const html = devices.map(device => {
+            const isOnline = device.status === 'online' || device.status === 'playing';
+            const isPlaying = device.status === 'playing';
+            const isLinked = device.binded;
+            
+            // Status
+            let statusClass = 'offline';
+            let statusText = 'Offline';
+            if (isPlaying) {
+                statusClass = 'playing';
+                statusText = 'Now Playing';
+            } else if (isLinked) {
+                statusClass = 'linked';
+                statusText = 'Linked';
+            } else if (isOnline) {
+                statusClass = 'online';
+                statusText = 'Ready';
+            }
+            
+            // Safe values
+            const safeName = escapeHtml(device.name || 'Unknown Device');
+            const safeType = escapeHtml(device.model || device.manufacturer || 'DLNA Device');
+            const safeUuid = escapeHtml(device.uuid || '');
+            
+            // Now Playing section
+            let nowPlayingHtml = '';
+            const track = device.current_track || {};
+            if (isPlaying && track.title) {
+                const progress = device.current_session_ms || 0;
+                const duration = track.duration || 0;
+                const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+                
+                nowPlayingHtml = `
+                    <div class="now-playing">
+                        <div class="now-playing-label">Now Playing</div>
+                        <div class="now-playing-track">${escapeHtml(track.title)}</div>
+                        <div class="now-playing-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <div class="progress-time">
+                            <span>${formatDuration(progress)}</span>
+                            <span>${formatDuration(duration)}</span>
+                        </div>
+                    </div>
+                    <div class="playback-controls">
+                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')">
+                            <i class="fas fa-step-backward"></i>
+                        </button>
+                        <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')">
+                            <i class="fas fa-step-forward"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Action button
+            let actionButton = '';
+            if (!isLinked) {
+                actionButton = `
+                    <button class="control-btn primary" onclick="event.stopPropagation(); checkLinked('${safeUuid}')">
+                        <i class="fas fa-link"></i>
+                        Link
+                    </button>
+                `;
+            } else if (!isPlaying) {
+                actionButton = `
+                    <button class="control-btn" onclick="event.stopPropagation(); relinkDevice('${safeUuid}')">
+                        <i class="fas fa-sync"></i>
+                        Relink
+                    </button>
+                `;
+            }
+
+            return `
+                <div class="device-card ${isPlaying ? 'playing' : ''} ${isLinked && !isPlaying ? 'linked' : ''}" 
+                     onclick="showDeviceDetails('${safeUuid}')">
+                    <div class="device-header">
+                        <div class="device-icon">
+                            <i class="fas fa-volume-up"></i>
+                        </div>
+                        <div class="device-info">
+                            <div class="device-name">${safeName}</div>
+                            <div class="device-type">${safeType}</div>
+                            <div class="device-status ${statusClass}">
+                                <span class="status-dot"></span>
+                                ${statusText}
+                            </div>
+                        </div>
+                    </div>
+                    ${nowPlayingHtml}
+                    ${actionButton ? `<div class="device-controls">${actionButton}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        grid.innerHTML = html;
+    }
+
+    async function sendCommand(uuid, command) {
+        try {
+            const response = await fetch(`/api/devices/${uuid}/command`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command })
+            });
+            if (!response.ok) throw new Error('Command failed');
+            refreshDevices();
+        } catch (error) {
+            console.error('Command error:', error);
+            Swal.fire('Error', 'Failed to send command', 'error');
+        }
+    }
+
+    function showDeviceDetails(uuid) {
+        const device = lastFetchedDevices.find(d => d.uuid === uuid);
+        if (!device) return;
+        
+        const safeName = escapeHtml(device.name || 'Unknown Device');
+        const safeIp = escapeHtml(device.ip || 'Unknown');
+        const safeModel = escapeHtml(device.model || device.manufacturer || 'Unknown');
+        
+        Swal.fire({
+            title: safeName,
+            html: `
+                <div style="text-align: left;">
+                    <p><strong>IP Address:</strong> ${safeIp}</p>
+                    <p><strong>Model:</strong> ${safeModel}</p>
+                    <p><strong>Status:</strong> ${device.status || 'Unknown'}</p>
+                    <p><strong>Linked:</strong> ${device.binded ? 'Yes' : 'No'}</p>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Rename',
+            cancelButtonText: 'Close'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                editDeviceName(uuid, device.name);
+            }
+        });
+    }
+
+    function editDeviceName(uuid, currentName) {
+        Swal.fire({
+            title: 'Rename Device',
+            input: 'text',
+            inputValue: currentName || '',
+            showCancelButton: true,
+            inputValidator: (value) => {
+                if (!value) return 'Please enter a name';
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                updateDeviceName(uuid, result.value).then(() => refreshDevices());
+            }
+        });
+    }
+
+    async function refreshDevices() {
+        const devices = await fetchDevices();
+        lastFetchedDevices = devices;
+        
+        // Filter by search
+        const searchInput = document.getElementById('deviceSearchInput');
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        const filteredDevices = devices.filter(device => {
+            if (!searchTerm) return true;
+            return (device.name || '').toLowerCase().includes(searchTerm) ||
+                   (device.ip || '').toLowerCase().includes(searchTerm);
+        });
+
+        renderDeviceGrid(filteredDevices);
+    }
+
+    // Search handler
+    document.getElementById('deviceSearchInput')?.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filteredDevices = lastFetchedDevices.filter(device => {
+            if (!searchTerm) return true;
+            return (device.name || '').toLowerCase().includes(searchTerm) ||
+                   (device.ip || '').toLowerCase().includes(searchTerm);
+        });
+        renderDeviceGrid(filteredDevices);
+    });
+
+    // Initial load and polling
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshDevices();
+        // Poll every 5 seconds
+        setInterval(refreshDevices, 5000);
+    });
+</script>
+{% endblock %}
