@@ -7,6 +7,38 @@
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/duration.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/relativeTime.min.js"></script>
+<style>
+    /* Icon button styles */
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    
+    .icon-btn:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+    
+    .device-controls {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+    }
+    
+    .device-controls .control-btn {
+        flex: 1;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -381,7 +413,12 @@
                         </div>
                     </div>
                     ${nowPlayingHtml}
-                    ${actionButton ? `<div class="device-controls">${actionButton}</div>` : ''}
+                    <div class="device-controls">
+                        ${actionButton}
+                        <button class="icon-btn" onclick="event.stopPropagation(); editDeviceName('${safeUuid}', '${safeName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Edit">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
