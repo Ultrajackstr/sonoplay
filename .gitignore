@@ -1,7 +1,5 @@
 # Ignore generated docs but keep plans
 docs/
-docs/plans/
-!docs/workflow
 
 # Python
 __pycache__/
