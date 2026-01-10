@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Lightbox
   // ========================================
   const lightbox = document.getElementById('lightbox');
-  const lightboxPlaceholder = lightbox?.querySelector('.lightbox-placeholder');
+  const lightboxImage = lightbox?.querySelector('.lightbox-image');
   const lightboxCaption = lightbox?.querySelector('.lightbox-caption');
   const lightboxClose = lightbox?.querySelector('.lightbox-close');
   const lightboxPrev = lightbox?.querySelector('.lightbox-prev');
@@ -94,11 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lightbox || galleryItems.length === 0) return;
     currentLightboxIndex = index;
     const item = galleryItems[index];
+    const img = item.querySelector('img');
     const caption = item.dataset.caption || '';
     
-    // Update placeholder label
-    if (lightboxPlaceholder) {
-      lightboxPlaceholder.dataset.label = caption;
+    // Update lightbox image
+    if (lightboxImage && img) {
+      lightboxImage.src = img.src;
+      lightboxImage.alt = caption;
     }
     if (lightboxCaption) {
       lightboxCaption.textContent = caption;
