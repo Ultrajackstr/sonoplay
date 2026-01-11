@@ -428,6 +428,7 @@ class VirtualDlnaDevice:
 
     async def SetVolume(self, volume_value: int, client=None):
         from plex.adapters import adapter_by_device  # local import to avoid cycle
+        from dlna.virtual.volume import map_volume_to_device
         
         resolved, _ = await self._resolve_members()
         active_devices = self._filter_active_devices(resolved)
@@ -448,14 +449,24 @@ class VirtualDlnaDevice:
         try:
             coros = []
             for device in active_devices:
-                device_volume = convert_volume(
-                    volume_value,
-                    100,
-                    0,
-                    getattr(device, "volume_max", 100),
-                    getattr(device, "volume_min", 0),
-                    getattr(device, "volume_step", 1),
-                )
+                # For heterogeneous groups, use member_capabilities for volume mapping
+                if self.is_heterogeneous and device.uuid in self.member_capabilities:
+                    caps = self.member_capabilities[device.uuid]
+                    device_volume = map_volume_to_device(
+                        volume_value,
+                        caps.get("volume_min", 0),
+                        caps.get("volume_max", 100),
+                    )
+                else:
+                    # Homogeneous or missing capabilities: use device attributes
+                    device_volume = convert_volume(
+                        volume_value,
+                        100,
+                        0,
+                        getattr(device, "volume_max", 100),
+                        getattr(device, "volume_min", 0),
+                        getattr(device, "volume_step", 1),
+                    )
                 coros.append(device.SetVolume(device_volume, client=client))
             results = await asyncio.gather(*coros, return_exceptions=True)
             for result in results:
