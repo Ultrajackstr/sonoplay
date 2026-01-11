@@ -51,6 +51,20 @@ cd SonoPlex
 docker compose up -d
 ```
 
+### Configuration (Optional)
+
+SonoPlex works out of the box with sensible defaults. To customize, copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
+
+Available settings:
+- `HTTP_PORT` - Web UI port (default: 32488)
+- `HOST_IP` - Your server's IP (auto-detected if not set)
+- `CLIENT_PROFILE` - Plex transcoding profile (Sonos, DLNA, Chromecast, etc.)
+
 ### Then:
 
 1. Open `http://your-server:32488`
