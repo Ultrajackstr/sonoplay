@@ -36,18 +36,18 @@ That's it. No complicated setup. No Raspberry Pi projects. Just works.
 
 ```bash
 docker run -d \
-  --name SonoPlex \
+  --name sonoplex \
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/SonoPlex:stable
+  ghcr.io/aquantumofdonuts/sonoplex:stable
 ```
 
 Or with Docker Compose:
 
 ```bash
-git clone --branch stable https://github.com/aquantumofdonuts/SonoPlex.git
-cd SonoPlex
+git clone --branch stable https://github.com/aquantumofdonuts/sonoplex.git
+cd sonoplex
 docker compose up -d
 ```
 
