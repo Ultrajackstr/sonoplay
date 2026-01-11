@@ -133,6 +133,9 @@ class VirtualDlnaDevice:
         self.name = definition.name
         self.member_uuids = list(definition.member_uuids)
         self.capabilities_hash = definition.capabilities_hash
+        # Heterogeneous support
+        self.is_heterogeneous = definition.is_heterogeneous
+        self.member_capabilities = dict(definition.member_capabilities)
         metadata = definition.metadata or {}
         self.model = metadata.get("model", f"{self.name} (Virtual Group)")
         self.ip = metadata.get("ip", "virtual")
@@ -168,6 +171,9 @@ class VirtualDlnaDevice:
         self.name = definition.name
         self.member_uuids = list(definition.member_uuids)
         self.capabilities_hash = definition.capabilities_hash
+        # Heterogeneous support
+        self.is_heterogeneous = definition.is_heterogeneous
+        self.member_capabilities = dict(definition.member_capabilities)
         metadata = definition.metadata or {}
         self._metadata = metadata
         self.model = metadata.get("model", f"{self.name} (Virtual Group)")
