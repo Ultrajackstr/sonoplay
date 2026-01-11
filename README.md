@@ -40,20 +40,20 @@ docker run -d \
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/SonoPlex
+  ghcr.io/aquantumofdonuts/SonoPlex:stable
 ```
 
 Or with Docker Compose:
 
 ```bash
-git clone https://github.com/aquantumofdonuts/SonoPlex.git
+git clone --branch stable https://github.com/aquantumofdonuts/SonoPlex.git
 cd SonoPlex
 docker compose up -d
 ```
 
 ### Then:
 
-1. Open `http://your-server:8456`
+1. Open `http://your-server:32488`
 2. Click "Link to Plex" on your speaker
 3. Open Plexamp → Cast → Select your speaker
 4. Enjoy 🎵
@@ -107,19 +107,7 @@ SonoPlex works with any DLNA/UPnP compatible device:
 
 ---
 
-## Configuration
 
-SonoPlex auto-detects everything. For advanced users:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `HTTP_PORT` | Web UI port | `8456` |
-| `HOST_IP` | Server IP (auto-detected) | Auto |
-| `CONFIG_PATH` | Persistent data directory | `/config` |
-
-See [Configuration Guide](docs/CONFIGURATION.md) for more options.
-
----
 
 ## How It Works
 
@@ -130,13 +118,6 @@ See [Configuration Guide](docs/CONFIGURATION.md) for more options.
 
 ---
 
-## Documentation
-
-- [Configuration Guide](docs/CONFIGURATION.md)
-- [API Reference](docs/API.md)
-- [Architecture Overview](docs/ARCHITECTURE.md)
-
----
 
 ## FAQ
 

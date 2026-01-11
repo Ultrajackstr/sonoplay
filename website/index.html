@@ -206,7 +206,7 @@
         <button class="tab-btn" data-tab="unraid">Unraid</button>
       </div>
       <div class="tab-content active" id="tab-compose">
-        <pre><code>git clone https://github.com/aquantumofdonuts/SonoPlex.git:latest
+        <pre><code>git clone --branch stable https://github.com/aquantumofdonuts/SonoPlex.git
 cd SonoPlex
 docker compose up -d
 
@@ -222,7 +222,7 @@ docker compose up -d
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/SonoPlex:latest</code></pre>
+  ghcr.io/aquantumofdonuts/SonoPlex:stable</code></pre>
         <button class="copy-btn" data-target="tab-run">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           <span>Copy</span>
