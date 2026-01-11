@@ -1022,13 +1022,23 @@ async def _build_definition(name: str, member_devices: List["DlnaDevice"], exist
     if not member_devices:
         raise VirtualDeviceError("Virtual device must include at least one member")
 
-    reference_signature = capability_signature(member_devices[0])
-    incompatible = [device.uuid for device in member_devices if capability_signature(device) != reference_signature]
-    if incompatible:
-        raise CapabilityMismatchError(
-            "Selected devices do not share identical capabilities",
-            offending_members=incompatible,
-        )
+    # Compute signatures for all members
+    member_signatures = {device.uuid: capability_signature(device) for device in member_devices}
+    unique_signatures = set(member_signatures.values())
+    is_heterogeneous = len(unique_signatures) > 1
+
+    # Use first device's signature as the group's reference
+    reference_signature = member_signatures[member_devices[0].uuid]
+
+    # Store per-member capabilities
+    member_capabilities = {}
+    for device in member_devices:
+        member_capabilities[device.uuid] = {
+            "volume_min": getattr(device, "volume_min", 0),
+            "volume_max": getattr(device, "volume_max", 100),
+            "volume_step": getattr(device, "volume_step", 1),
+            "capability_hash": member_signatures[device.uuid],
+        }
 
     volume_info = {
         "min": member_devices[0].volume_min,
@@ -1058,6 +1068,8 @@ async def _build_definition(name: str, member_devices: List["DlnaDevice"], exist
         name=name,
         member_uuids=[device.uuid for device in member_devices],
         capabilities_hash=reference_signature,
+        is_heterogeneous=is_heterogeneous,
+        member_capabilities=member_capabilities,
         metadata=metadata,
         created_at=now if existing_uuid is None else _virtual_devices[existing_uuid].definition.created_at,
         updated_at=now,
