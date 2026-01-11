@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     plex_notify_interval: float = 0.5
     config_path: str = "config"
     data_file_name: str = "data.json"
-    enable_onboarding_wizard: bool = False
+    enable_onboarding_wizard: bool = True
     # Audio transcoding thresholds - exceeding these triggers Plex transcode
     # Sonos speakers typically support up to ~320kbps for network streams
     # and max 48kHz sample rate. CD quality is 1411 kbps at 44.1kHz.
