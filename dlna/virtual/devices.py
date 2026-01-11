@@ -101,6 +101,8 @@ class VirtualDeviceDefinition:
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
+    is_heterogeneous: bool = False
+    member_capabilities: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "VirtualDeviceDefinition":
@@ -112,6 +114,8 @@ class VirtualDeviceDefinition:
             metadata=dict(payload.get("metadata", {})),
             created_at=payload.get("created_at", _now_iso()),
             updated_at=payload.get("updated_at", _now_iso()),
+            is_heterogeneous=payload.get("is_heterogeneous", False),
+            member_capabilities=dict(payload.get("member_capabilities", {})),
         )
 
     def to_dict(self) -> Dict[str, Any]:
