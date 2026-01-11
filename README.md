@@ -32,6 +32,8 @@ That's it. No complicated setup. No Raspberry Pi projects. Just works.
 
 ## Quick Start
 
+
+
 ### Docker (Recommended)
 
 ```bash
@@ -114,9 +116,12 @@ SonoPlex works with any DLNA/UPnP compatible device:
 ## Requirements
 
 - Docker (recommended) or Python 3.12+
+- Docker Compose v2.17+ (if using `docker compose`)
 - Plex Media Server on your network
 - Plex Pass (for Plexamp)
 - DLNA-compatible speakers/devices
+
+> **Note:** The `docker-compose.yaml` uses modern syntax (`env_file.required`) that requires Docker Compose v2.17 or later. Check your version with `docker compose version`.
 
 ---
 
