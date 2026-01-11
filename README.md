@@ -90,7 +90,6 @@ Create virtual device groups for synchronized playback across multiple speakers.
 
 ### 🎨 Modern Web Interface
 - Device management dashboard
-- 8 beautiful themes
 - Real-time status updates
 - Mobile-friendly design
 
