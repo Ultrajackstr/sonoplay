@@ -799,10 +799,10 @@
                     
                     <div id="swal-capability-warning" class="capability-info" style="display: none;">
                         <div style="display: flex; align-items: flex-start; gap: var(--space-sm);">
-                            <i class="fas fa-info-circle" style="color: var(--info); margin-top: 2px;"></i>
+                            <i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-top: 2px;"></i>
                             <div>
-                                <strong>Multi-device group</strong><br>
-                                <span style="color: var(--text-secondary);">Each device will receive its own optimized stream from Plex. Volume is normalized across all devices.</span>
+                                <strong>Audio sync limitation</strong><br>
+                                <span style="color: var(--text-secondary);">DLNA cannot synchronize playback across devices. Speakers will be slightly out of sync (100-500ms). For same-room use, group speakers in your speaker's native app first, then select one speaker here.</span>
                             </div>
                         </div>
                     </div>
@@ -903,10 +903,10 @@
                 `;
             }).join('');
             
-            // Show/hide capability warning
+            // Show sync warning whenever 2+ devices are selected (sync limitation applies to all multi-device groups)
             const warningEl = document.getElementById('swal-capability-warning');
             if (warningEl) {
-                warningEl.style.display = mismatchFound ? 'block' : 'none';
+                warningEl.style.display = selectedMembers.length >= 2 ? 'block' : 'none';
             }
         }
     }
