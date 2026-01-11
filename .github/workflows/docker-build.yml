@@ -3,6 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     tags:
+      - 'v*'
       - 'stable'
   workflow_dispatch:
     inputs:
@@ -46,6 +47,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=stable,enable=${{ github.ref == 'refs/tags/stable' }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=sha,prefix=
 
