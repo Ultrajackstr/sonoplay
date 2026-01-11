@@ -225,11 +225,11 @@
         font-size: 0.75rem;
     }
     
-    .capability-warning {
+    .capability-info {
         margin-top: var(--space-md);
         padding: var(--space-sm) var(--space-md);
-        background: rgba(234, 179, 8, 0.1);
-        color: var(--warning);
+        background: rgba(59, 130, 246, 0.1);
+        border-left: 3px solid var(--info);
         border-radius: var(--radius-md);
         font-size: 0.875rem;
     }
@@ -779,9 +779,14 @@
                         </div>
                     </div>
                     
-                    <div id="swal-capability-warning" class="capability-warning" style="display: none;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Selected devices have different capabilities.
+                    <div id="swal-capability-warning" class="capability-info" style="display: none;">
+                        <div style="display: flex; align-items: flex-start; gap: var(--space-sm);">
+                            <i class="fas fa-info-circle" style="color: var(--info); margin-top: 2px;"></i>
+                            <div>
+                                <strong>Multi-device group</strong><br>
+                                <span style="color: var(--text-secondary);">Each device will receive its own optimized stream from Plex. Volume is normalized across all devices.</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `,
@@ -854,7 +859,8 @@
                 let warning = '';
                 if (device && expectedHash && device.capabilities_hash !== expectedHash) {
                     mismatchFound = true;
-                    warning = '<div style="font-size: 0.7rem; color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Mismatch</div>';
+                    // Info badge instead of warning - heterogeneous groups are supported
+                    warning = '<div style="font-size: 0.7rem; color: var(--info);"><i class="fas fa-info-circle"></i> Different type</div>';
                 }
 
                 return `
