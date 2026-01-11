@@ -93,7 +93,20 @@
         background: rgba(239, 68, 68, 0.1);
         color: var(--danger);
     }
-    
+
+    .heterogeneous-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        padding: 2px 6px;
+        border-radius: var(--radius-full);
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--info);
+        margin-left: var(--space-xs);
+    }
+
     /* Card actions row */
     .card-actions {
         display: flex;
@@ -416,6 +429,11 @@
             statusText = 'Partial';
         }
         
+        // Heterogeneous badge
+        const heterogeneousBadge = group.is_heterogeneous 
+            ? '<span class="heterogeneous-badge"><i class="fas fa-cubes"></i> Mixed</span>' 
+            : '';
+        
         // Safe values
         const safeName = escapeHtml(group.name || 'Unnamed Group');
         const safeUuid = escapeHtml(group.uuid || '');
@@ -499,7 +517,7 @@
                         <div class="device-type">${onlineCount}/${members.length} devices online</div>
                         <div class="group-status ${statusClass}">
                             ${statusText}
-                        </div>
+                        </div>${heterogeneousBadge}
                     </div>
                 </div>
                 <div class="member-list">
