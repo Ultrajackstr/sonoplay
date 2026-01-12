@@ -926,8 +926,11 @@ class PlexDlnaAdapter(object):
         self.state.check_all_next_loop = True
 
     async def pause(self):
+        # Only send Pause command if currently playing - avoids UPnP error 701
+        # (Transition not available) when device is already stopped/paused
+        if self.state.state == "PLAYING":
+            await self.dlna.Pause()
         self.state.update(state="PAUSED_PLAYBACK")
-        await self.dlna.Pause()
         self.state.check_all_next_loop = True
 
     async def prev(self):
