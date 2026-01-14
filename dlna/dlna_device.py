@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape as xml_escape
 
 import aiohttp
-from aiohttp import ClientConnectorError
+from aiohttp import ClientConnectorError, ClientConnectionError
 
 from plex.adapters import remove_adapter
 from utils import xml2dict, UPNP_RC_SERVICE_TYPE, UPNP_AVT_SERVICE_TYPE, g, extract_value
@@ -51,6 +51,7 @@ DEFAULT_ACTION_DATA = {
 }
 
 ERROR_COUNT_TO_REMOVE = 20
+MAX_RETRIES = 3
 
 # Device list and lock for thread-safe access
 devices = []
@@ -144,22 +145,28 @@ class DlnaDeviceService(object):
                     data[arg_name] = DEFAULT_ACTION_DATA[arg_name]
         payload = self.payload_from_template(action, data)
 
-        try:
-            async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=5) as response:
-                if not response.ok:
-                    raise Exception(f"service {self.control_url} {action} {response.status} {await response.text()}")
-                self.device.repeat_error_count = 0
-                info = xml2dict(await response.text())
-                error = info.Envelope.Body.Fault.detail.UPnPError.get('errorDescription')
-                if error is not None:
-                    logger.warning("dlna device control request error: %s", info.toDict())
-                    return None
-                return info.Envelope.Body.get(f"{action}Response")
-        except Exception as e:
-            logger.error("dlna %s %s control error %s: %s", self.device.name, action, e.__class__.__name__, str(e))
-            if "different loop" in str(e):
-                traceback.print_tb(e.__traceback__)
-            if isinstance(e, ClientConnectorError):
+        last_exception = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=5) as response:
+                    if not response.ok:
+                        raise Exception(f"service {self.control_url} {action} {response.status} {await response.text()}")
+                    self.device.repeat_error_count = 0
+                    info = xml2dict(await response.text())
+                    error = info.Envelope.Body.Fault.detail.UPnPError.get('errorDescription')
+                    if error is not None:
+                        logger.warning("dlna device control request error: %s", info.toDict())
+                        return None
+                    return info.Envelope.Body.get(f"{action}Response")
+            except ClientConnectionError as e:
+                last_exception = e
+                if attempt < MAX_RETRIES:
+                    logger.debug("dlna %s %s connection error (attempt %d/%d), retrying: %s", 
+                                self.device.name, action, attempt, MAX_RETRIES, str(e))
+                    continue
+                # All retries exhausted
+                logger.warning("dlna %s %s connection failed after %d attempts: %s",
+                              self.device.name, action, MAX_RETRIES, str(e))
                 self.device.repeat_error_count += 1
                 if self.device.repeat_error_count >= ERROR_COUNT_TO_REMOVE:
                     logger.warning("remove device %s due to %d connection errors", self.device.name, self.device.repeat_error_count)
@@ -167,7 +174,13 @@ class DlnaDeviceService(object):
                         asyncio.create_task(self.device.remove_self())
                     else:
                         asyncio.run_coroutine_threadsafe(self.device.remove_self(), self.device.loop)
-            return None
+                raise
+            except Exception as e:
+                # Non-connection errors: don't retry, just raise
+                logger.error("dlna %s %s control error %s: %s", self.device.name, action, e.__class__.__name__, str(e))
+                if "different loop" in str(e):
+                    traceback.print_tb(e.__traceback__)
+                raise
 
     async def subscribe(self, timeout_sec=None):
         if timeout_sec is None:
