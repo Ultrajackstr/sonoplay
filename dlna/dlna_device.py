@@ -62,6 +62,20 @@ class ServerErrorException(Exception):
         super().__init__(f"HTTP {status}: {body[:100]}")
 
 
+def sanitize_soap_response(xml: str) -> str:
+    """Fix known SOAP/XML quirks from non-compliant devices.
+    
+    Known issues:
+    - Oppo: Returns <& instead of <s: for envelope namespace
+    
+    Future quirks should be added here as discovered.
+    """
+    # Fix Oppo malformed namespace prefix
+    xml = xml.replace('<&', '<s:')
+    xml = xml.replace('</&', '</s:')
+    return xml
+
+
 # Device list and lock for thread-safe access
 devices = []
 devices_lock = asyncio.Lock()
