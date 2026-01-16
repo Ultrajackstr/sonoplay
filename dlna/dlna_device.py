@@ -82,6 +82,7 @@ def sanitize_soap_response(xml: str) -> str:
     1. Sonos/Various: Illegal XML 1.0 control characters (SoCo)
     2. Oppo: Returns <& instead of <s: for envelope namespace prefix
     3. Various: Missing dlna: namespace declaration (jupnp)
+    4. Belkin WeMo: Non-standard urn:Belkin namespace (jupnp)
     
     Future quirks should be added here as discovered.
     """
@@ -106,6 +107,9 @@ def sanitize_soap_response(xml: str) -> str:
             xml,
             count=1
         )
+    
+    # 4. Fix Belkin WeMo non-standard namespace (jupnp)
+    xml = xml.replace('urn:Belkin:device-1-0', 'urn:schemas-upnp-org:device-1-0')
     
     return xml
 
