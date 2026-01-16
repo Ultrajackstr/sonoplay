@@ -83,6 +83,7 @@ def sanitize_soap_response(xml: str) -> str:
     2. Oppo: Returns <& instead of <s: for envelope namespace prefix
     3. Various: Missing dlna: namespace declaration (jupnp)
     4. Belkin WeMo: Non-standard urn:Belkin namespace (jupnp)
+    5. Various: Garbage characters after closing tag (jupnp)
     
     Future quirks should be added here as discovered.
     """
@@ -110,6 +111,15 @@ def sanitize_soap_response(xml: str) -> str:
     
     # 4. Fix Belkin WeMo non-standard namespace (jupnp)
     xml = xml.replace('urn:Belkin:device-1-0', 'urn:schemas-upnp-org:device-1-0')
+    
+    # 5. Remove trailing garbage after closing tags (jupnp)
+    for closing_tag in ['</s:Envelope>', '</root>']:
+        idx = xml.find(closing_tag)
+        if idx != -1:
+            end_idx = idx + len(closing_tag)
+            if end_idx < len(xml):
+                xml = xml[:end_idx]
+            break
     
     return xml
 
