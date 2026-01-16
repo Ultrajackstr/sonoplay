@@ -79,26 +79,32 @@ def sanitize_soap_response(xml: str) -> str:
     """Fix known SOAP/XML quirks from non-compliant devices.
     
     Known issues (sources):
-    1. Sonos/Various: Illegal XML 1.0 control characters (SoCo)
-    2. Oppo: Returns <& instead of <s: for envelope namespace prefix
-    3. Various: Missing dlna: namespace declaration (jupnp)
-    4. Belkin WeMo: Non-standard urn:Belkin namespace (jupnp)
-    5. Various: Garbage characters after closing tag (jupnp)
+    1. Windows UPnP: HTTP headers prepended to XML body (jupnp)
+    2. Sonos/Various: Illegal XML 1.0 control characters (SoCo)
+    3. Oppo: Returns <& instead of <s: for envelope namespace prefix
+    4. Various: Missing dlna: namespace declaration (jupnp)
+    5. Belkin WeMo: Non-standard urn:Belkin namespace (jupnp)
+    6. Various: Garbage characters after closing tag (jupnp)
     
     Future quirks should be added here as discovered.
     """
     if not xml:
         return xml
     
-    # 1. Remove illegal XML 1.0 control characters (Sonos, various devices)
+    # 1. Remove leading HTTP garbage before XML declaration (Windows UPnP)
+    xml_start = xml.find('<?xml')
+    if xml_start > 0:
+        xml = xml[xml_start:]
+    
+    # 2. Remove illegal XML 1.0 control characters (Sonos, various devices)
     xml = _ILLEGAL_XML_CHARS_RE.sub('', xml)
     
-    # 2. Fix Oppo malformed namespace prefix (order matters - do xmlns first)
+    # 3. Fix Oppo malformed namespace prefix (order matters - do xmlns first)
     xml = xml.replace('xmlns:&=', 'xmlns:s=')
     xml = xml.replace('<&', '<s:')
     xml = xml.replace('</&', '</s:')
     
-    # 3. Add missing dlna: namespace declaration (jupnp, various devices)
+    # 4. Add missing dlna: namespace declaration (jupnp, various devices)
     # Only add if dlna: prefix is used but xmlns:dlna is not declared
     if 'dlna:' in xml and 'xmlns:dlna' not in xml:
         # Find the first element and add namespace to it
@@ -109,10 +115,10 @@ def sanitize_soap_response(xml: str) -> str:
             count=1
         )
     
-    # 4. Fix Belkin WeMo non-standard namespace (jupnp)
+    # 5. Fix Belkin WeMo non-standard namespace (jupnp)
     xml = xml.replace('urn:Belkin:device-1-0', 'urn:schemas-upnp-org:device-1-0')
     
-    # 5. Remove trailing garbage after closing tags (jupnp)
+    # 6. Remove trailing garbage after closing tags (jupnp)
     for closing_tag in ['</s:Envelope>', '</root>']:
         idx = xml.find(closing_tag)
         if idx != -1:
