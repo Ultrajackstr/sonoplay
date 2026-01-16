@@ -81,6 +81,7 @@ def sanitize_soap_response(xml: str) -> str:
     Known issues (sources):
     1. Sonos/Various: Illegal XML 1.0 control characters (SoCo)
     2. Oppo: Returns <& instead of <s: for envelope namespace prefix
+    3. Various: Missing dlna: namespace declaration (jupnp)
     
     Future quirks should be added here as discovered.
     """
@@ -94,6 +95,17 @@ def sanitize_soap_response(xml: str) -> str:
     xml = xml.replace('xmlns:&=', 'xmlns:s=')
     xml = xml.replace('<&', '<s:')
     xml = xml.replace('</&', '</s:')
+    
+    # 3. Add missing dlna: namespace declaration (jupnp, various devices)
+    # Only add if dlna: prefix is used but xmlns:dlna is not declared
+    if 'dlna:' in xml and 'xmlns:dlna' not in xml:
+        # Find the first element and add namespace to it
+        xml = re.sub(
+            r'(<\w+)(\s)',
+            r'\1 xmlns:dlna="urn:schemas-dlna-org:device-1-0"\2',
+            xml,
+            count=1
+        )
     
     return xml
 
