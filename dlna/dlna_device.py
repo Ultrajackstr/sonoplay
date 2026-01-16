@@ -66,11 +66,13 @@ def sanitize_soap_response(xml: str) -> str:
     """Fix known SOAP/XML quirks from non-compliant devices.
     
     Known issues:
-    - Oppo: Returns <& instead of <s: for envelope namespace
+    - Oppo: Returns <& instead of <s: for envelope namespace prefix
+      (both in tags like <&Envelope and in namespace declarations xmlns:&=)
     
     Future quirks should be added here as discovered.
     """
-    # Fix Oppo malformed namespace prefix
+    # Fix Oppo malformed namespace prefix (order matters - do xmlns first)
+    xml = xml.replace('xmlns:&=', 'xmlns:s=')
     xml = xml.replace('<&', '<s:')
     xml = xml.replace('</&', '</s:')
     return xml
@@ -179,7 +181,19 @@ class DlnaDeviceService(object):
                     if not response.ok:
                         raise Exception(f"service {self.control_url} {action} {response.status} {await response.text()}")
                     self.device.repeat_error_count = 0
-                    info = xml2dict(await response.text())
+                    
+                    # Get response, sanitize for device quirks, parse defensively
+                    response_text = await response.text()
+                    sanitized = sanitize_soap_response(response_text)
+                    if sanitized != response_text:
+                        logger.debug("dlna %s %s sanitized malformed XML response", self.device.name, action)
+                    
+                    try:
+                        info = xml2dict(sanitized)
+                    except Exception as parse_error:
+                        logger.warning("dlna %s %s XML parse error: %s", self.device.name, action, str(parse_error))
+                        return None
+                    
                     error = info.Envelope.Body.Fault.detail.UPnPError.get('errorDescription')
                     if error is not None:
                         logger.warning("dlna device control request error: %s", info.toDict())
