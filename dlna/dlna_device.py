@@ -53,6 +53,15 @@ DEFAULT_ACTION_DATA = {
 ERROR_COUNT_TO_REMOVE = 20
 MAX_RETRIES = 3
 
+
+class ServerErrorException(Exception):
+    """Raised for HTTP 5xx errors that should be retried."""
+    def __init__(self, status: int, body: str):
+        self.status = status
+        self.body = body
+        super().__init__(f"HTTP {status}: {body[:100]}")
+
+
 # Device list and lock for thread-safe access
 devices = []
 devices_lock = asyncio.Lock()
