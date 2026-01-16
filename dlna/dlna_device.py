@@ -59,7 +59,7 @@ class ServerErrorException(Exception):
     def __init__(self, status: int, body: str):
         self.status = status
         self.body = body
-        super().__init__(f"HTTP {status}: {body[:100]}")
+        super().__init__(f"HTTP {status}: {(body or '')[:100]}")
 
 
 def sanitize_soap_response(xml: str) -> str:
