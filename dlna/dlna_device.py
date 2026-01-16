@@ -172,6 +172,10 @@ class DlnaDeviceService(object):
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=5) as response:
+                    # Check for 5xx errors that should be retried
+                    if 500 <= response.status < 600:
+                        raise ServerErrorException(response.status, await response.text())
+                    # 4xx and other errors still raise immediately
                     if not response.ok:
                         raise Exception(f"service {self.control_url} {action} {response.status} {await response.text()}")
                     self.device.repeat_error_count = 0
@@ -197,6 +201,14 @@ class DlnaDeviceService(object):
                         asyncio.create_task(self.device.remove_self())
                     else:
                         asyncio.run_coroutine_threadsafe(self.device.remove_self(), self.device.loop)
+                raise
+            except ServerErrorException as e:
+                if attempt < MAX_RETRIES:
+                    logger.debug("dlna %s %s server error %d (attempt %d/%d), retrying",
+                                self.device.name, action, e.status, attempt, MAX_RETRIES)
+                    continue
+                logger.warning("dlna %s %s server error %d after %d attempts",
+                              self.device.name, action, e.status, MAX_RETRIES)
                 raise
             except Exception as e:
                 # Non-connection errors: don't retry, just raise
