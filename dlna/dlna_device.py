@@ -54,6 +54,9 @@ ERROR_COUNT_TO_REMOVE = 20
 MAX_RETRIES = 3
 
 
+import re
+
+
 class ServerErrorException(Exception):
     """Raised for HTTP 5xx errors that should be retried."""
     def __init__(self, status: int, body: str):
@@ -62,19 +65,36 @@ class ServerErrorException(Exception):
         super().__init__(f"HTTP {status}: {(body or '')[:100]}")
 
 
+# Regex pattern for illegal XML 1.0 characters
+# Allowed: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+# Forbidden: #x0-#x8 | #xB | #xC | #xE-#x1F | #xD800-#xDFFF | #xFFFE | #xFFFF
+# Source: SoCo library, XML 1.0 spec section 2.2
+_ILLEGAL_XML_CHARS_RE = re.compile(
+    '[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f'
+    '\ud800-\udfff\ufdd0-\ufdef\ufffe\uffff]'
+)
+
+
 def sanitize_soap_response(xml: str) -> str:
     """Fix known SOAP/XML quirks from non-compliant devices.
     
-    Known issues:
-    - Oppo: Returns <& instead of <s: for envelope namespace prefix
-      (both in tags like <&Envelope and in namespace declarations xmlns:&=)
+    Known issues (sources):
+    1. Sonos/Various: Illegal XML 1.0 control characters (SoCo)
+    2. Oppo: Returns <& instead of <s: for envelope namespace prefix
     
     Future quirks should be added here as discovered.
     """
-    # Fix Oppo malformed namespace prefix (order matters - do xmlns first)
+    if not xml:
+        return xml
+    
+    # 1. Remove illegal XML 1.0 control characters (Sonos, various devices)
+    xml = _ILLEGAL_XML_CHARS_RE.sub('', xml)
+    
+    # 2. Fix Oppo malformed namespace prefix (order matters - do xmlns first)
     xml = xml.replace('xmlns:&=', 'xmlns:s=')
     xml = xml.replace('<&', '<s:')
     xml = xml.replace('</&', '</s:')
+    
     return xml
 
 
