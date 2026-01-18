@@ -7,6 +7,39 @@ The latest version is always available by pulling the [stable] tag.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.2] - 2026-01-17
+
+This release improves DLNA device compatibility with a device quirks system for manufacturer-specific workarounds.
+
+### Added
+
+#### Device Quirks System
+- New `dlna/quirks.py` module with per-device workaround registry
+- Case-insensitive regex matching against device model names
+- User overrides via `device_quirks` in data.json
+- Built-in quirks for Sony, Denon/HEOS, Marantz, and Bose SoundTouch
+
+#### Sony Device Fixes
+- Premature STOPPED filtering: ignore spurious STOPPED events before PLAYING is seen
+- Wait-for-can-play: poll `GetCurrentTransportActions` before sending play commands
+
+#### Subscription Tracking
+- Track subscription expiry time for proactive renewal
+- `needs_resubscription()` method for checking renewal status
+- Extended timeout support (540s) for Denon/HEOS/Marantz devices
+
+### Changed
+
+- Increased `http_timeout_dlna` from 5s to 10s for slower devices
+- Added 0.5s delay between retry attempts to prevent retry storms
+- Use `settings.http_timeout_dlna` instead of hardcoded timeout values
+
+### Tests
+
+- 39 new tests across 4 test files (201 total tests pass)
+
+---
+
 ## [v1.1.1] - 2026-01-16
 
 # Release Notes: DLNA Device Compatibility Improvements

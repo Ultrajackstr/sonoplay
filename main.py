@@ -1,6 +1,8 @@
 from logging_config import configure_logging
+from version import print_banner
 
 configure_logging()
+print_banner()
 
 from plex.plexserver import start_plex_server
 
