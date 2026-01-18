@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     http_timeout_default: float = 10.0  # Default timeout for all requests
     http_timeout_connect: float = 5.0   # Connection timeout
     http_timeout_plex_tv: float = 10.0  # Timeout for plex.tv API requests
-    http_timeout_dlna: float = 5.0      # Timeout for local DLNA device requests
+    http_timeout_dlna: float = 10.0     # Timeout for local DLNA device requests (was 5.0, see issue #10)
     
     # Subscription and polling settings
     subscriber_ttl_seconds: int = 300   # How long before idle subscribers are cleaned up

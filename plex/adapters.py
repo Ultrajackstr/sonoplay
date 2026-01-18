@@ -496,6 +496,9 @@ class PlexDlnaAdapter(object):
         self._last_operation_finish_time: Optional[float] = None
         self._post_operation_protection_window = 2.0  # seconds
         self._last_finished_target_uri: Optional[str] = None
+        # Premature STOPPED filtering (LMS-uPnP #63, go2tv #43)
+        self._seen_playing_since_operation = False
+        self._operation_start_time: Optional[float] = None
 
     def _start_transport_operation(self, target_uri: str) -> int:
         self._operation_sequence += 1
@@ -511,6 +514,9 @@ class PlexDlnaAdapter(object):
             "current_uri": target_uri
         }
         self._suppress_auto_next = False
+        # Reset premature STOPPED tracking
+        self._seen_playing_since_operation = False
+        self._operation_start_time = time.monotonic()
         logger.debug("%s transport operation %d started for %s", self.dlna.name, self._active_operation_id, target_uri)
         return self._active_operation_id
 
@@ -530,6 +536,45 @@ class PlexDlnaAdapter(object):
         self._active_operation_state_confirmed = False
         self._active_operation_target_paused = False
         self._transport_state_override = None
+
+    def _should_ignore_premature_stopped(self, changed_state: DotMap) -> bool:
+        """Check if STOPPED state should be ignored as premature.
+        
+        Many devices (Sony, Denon, recent TVs) emit STOPPED immediately after
+        SetAVTransportURI but before Play command is sent. This causes the
+        event subscription to be closed prematurely.
+        
+        Source: LMS-uPnP #63, go2tv #43
+        
+        Returns True if STOPPED should be ignored.
+        """
+        # Only check during active transport operations
+        if self._active_operation_id == 0:
+            return False
+        
+        # Only filter STOPPED state changes
+        if 'state' not in changed_state or changed_state.state != "STOPPED":
+            return False
+        
+        # Check quirk setting
+        from dlna.quirks import get_device_quirks
+        quirks = get_device_quirks(self.dlna)
+        if not quirks.get("ignore_premature_stopped", True):
+            return False
+        
+        # If we've seen PLAYING, STOPPED is legitimate
+        if self._seen_playing_since_operation:
+            return False
+        
+        # Safety timeout: if operation started >10s ago, accept STOPPED
+        if self._operation_start_time:
+            elapsed = time.monotonic() - self._operation_start_time
+            if elapsed > 10.0:
+                logger.debug("%s accepting STOPPED after %.1fs timeout", self.dlna.name, elapsed)
+                return False
+        
+        logger.debug("%s ignoring premature STOPPED (no PLAYING seen yet)", self.dlna.name)
+        return True
 
     def _check_post_operation_false_stop(self, changed_state: DotMap) -> bool:
         """
@@ -661,6 +706,16 @@ class PlexDlnaAdapter(object):
         if __debug__ or 'elapsed' not in changed_state.keys() or len(changed_state.keys()) > 2 or \
                 not (0 <= changed_state.elapsed - changed_state.old.elapsed <= 1000):
             logger.debug("%s state change notified %s", self.dlna.name, changed_state.toDict())
+        
+        # Track PLAYING state for premature STOPPED detection
+        if 'state' in changed_state and changed_state.state == "PLAYING":
+            self._seen_playing_since_operation = True
+        
+        # Check for premature STOPPED that should be ignored (LMS-uPnP #63, go2tv #43)
+        if self._should_ignore_premature_stopped(changed_state):
+            self.state.update(state="TRANSITIONING")
+            return
+        
         if self._active_operation_id:
             if 'current_uri' in changed_state:
                 if changed_state.current_uri == self._active_target_uri:

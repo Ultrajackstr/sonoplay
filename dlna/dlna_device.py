@@ -21,6 +21,7 @@
 import asyncio
 import logging
 import re
+import time
 import traceback
 from urllib.parse import urlparse, urljoin
 
@@ -177,6 +178,9 @@ class DlnaDeviceService(object):
         self.subscribed = False
         self._spec_info = None
         self.next_subscribe_call_time = None
+        # Subscription expiry tracking for auto-renewal
+        self._subscription_expiry: datetime | None = None
+        self._resubscribe_margin_seconds = 30
 
     def payload_from_template(self, action: str, data: dict):
         fields = ''
@@ -267,7 +271,7 @@ class DlnaDeviceService(object):
         last_exception = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=5) as response:
+                async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=settings.http_timeout_dlna) as response:
                     # Check for 5xx errors - may be a valid SOAP Fault (per UPnP spec)
                     if 500 <= response.status < 600:
                         response_text = await response.text()
@@ -306,6 +310,7 @@ class DlnaDeviceService(object):
                 if attempt < MAX_RETRIES:
                     logger.debug("dlna %s %s connection error (attempt %d/%d), retrying: %s", 
                                 self.device.name, action, attempt, MAX_RETRIES, str(e))
+                    await asyncio.sleep(0.5)  # Brief delay for Samsung-style empty first response
                     continue
                 # All retries exhausted
                 logger.warning("dlna %s %s connection failed after %d attempts: %s",
@@ -322,6 +327,7 @@ class DlnaDeviceService(object):
                 if attempt < MAX_RETRIES:
                     logger.debug("dlna %s %s server error %d (attempt %d/%d), retrying",
                                 self.device.name, action, e.status, attempt, MAX_RETRIES)
+                    await asyncio.sleep(0.5)  # Brief delay before retry
                     continue
                 logger.warning("dlna %s %s server error %d after %d attempts",
                               self.device.name, action, e.status, MAX_RETRIES)
@@ -335,7 +341,10 @@ class DlnaDeviceService(object):
 
     async def subscribe(self, timeout_sec=None):
         if timeout_sec is None:
-            timeout_sec = settings.dlna_subscribe_timeout
+            # Check for device-specific quirk (e.g., HEOS 9-minute limit)
+            from dlna.quirks import get_device_quirks
+            quirks = get_device_quirks(self.device)
+            timeout_sec = quirks.get("subscription_timeout") or settings.dlna_subscribe_timeout
         if settings.host_ip is None:
             settings.host_ip = guess_local_ip()
         if settings.host_ip in (None, "0.0.0.0"):
@@ -356,8 +365,17 @@ class DlnaDeviceService(object):
         async with g.http.request("SUBSCRIBE", self.event_url, headers=headers) as response:
             if response.ok:
                 self.next_subscribe_call_time = datetime.now(timezone.utc) + timedelta(seconds=(timeout_sec // 2))
+                self._subscription_expiry = datetime.now(timezone.utc) + timedelta(seconds=timeout_sec)
+                logger.debug("%s subscribed, expires in %ds", self.device.name, timeout_sec)
                 return True
         return False
+
+    def needs_resubscription(self) -> bool:
+        """Check if subscription should be renewed."""
+        if self._subscription_expiry is None:
+            return False
+        margin = timedelta(seconds=self._resubscribe_margin_seconds)
+        return datetime.now(timezone.utc) >= (self._subscription_expiry - margin)
 
     async def get_spec(self, client: aiohttp.ClientSession = None):
         if self._spec_info is not None:
@@ -507,6 +525,46 @@ class DlnaDevice(object):
 
     def _get_service(self, service_type: str):
         return self.services.get(service_type)
+
+    async def wait_for_can_play(self, client: aiohttp.ClientSession = None, max_wait: float = 5.0) -> bool:
+        """Wait until device can accept Play command.
+        
+        Some devices need time to transition states after SetAVTransportURI
+        before they'll accept a Play command. This polls GetCurrentTransportActions
+        until "Play" is in the allowed actions.
+        
+        Source: async_upnp_client DmrDevice.async_wait_for_can_play()
+        
+        Args:
+            client: aiohttp session for DLNA requests
+            max_wait: Maximum seconds to wait (default 5.0)
+            
+        Returns:
+            True if Play is available, False if timeout
+        """
+        await self.get_data()
+        avt_service = self._get_service(UPNP_AVT_SERVICE_TYPE)
+        if avt_service is None:
+            return True  # No AVT service, assume ready
+        
+        poll_interval = 0.25
+        end_time = time.monotonic() + max_wait
+        
+        while time.monotonic() < end_time:
+            try:
+                result = await avt_service.control("GetCurrentTransportActions", {"InstanceID": 0}, client=client)
+                if result:
+                    actions = getattr(result, "Actions", "") or ""
+                    if "Play" in actions:
+                        logger.debug("%s wait_for_can_play: ready", self.name)
+                        return True
+            except Exception as e:
+                logger.debug("%s wait_for_can_play error: %s", self.name, e)
+            
+            await asyncio.sleep(poll_interval)
+        
+        logger.debug("%s wait_for_can_play: timeout after %.1fs", self.name, max_wait)
+        return False
 
     async def subscribe(self, service_type: str = UPNP_AVT_SERVICE_TYPE, timeout_sec=120):
         await self.get_data()
