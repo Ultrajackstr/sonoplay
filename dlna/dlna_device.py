@@ -187,6 +187,48 @@ class DlnaDeviceService(object):
         payload = PAYLOAD_FMT.format(action=action, urn=self.urn, fields=fields)
         return payload
 
+    def _try_parse_soap_fault(self, response_text: str, action: str):
+        """Try to parse HTTP 500 response as a SOAP Fault.
+        
+        Per UPnP spec, SOAP Faults are delivered via HTTP 500. If the response
+        is a valid SOAP Fault, we should NOT retry - it's a proper error response.
+        
+        Returns:
+            'handled' if a SOAP Fault was successfully parsed (caller should return None)
+            None if the response couldn't be parsed as a SOAP Fault (caller should retry)
+        """
+        if not response_text or not response_text.strip():
+            return None  # Empty body - retry
+        
+        try:
+            sanitized = sanitize_soap_response(response_text)
+            info = xml2dict(sanitized)
+            
+            # Check for SOAP Fault structure
+            fault = info.Envelope.Body.Fault
+            if fault:
+                # Extract UPnP error details if present
+                error_code = fault.detail.UPnPError.get('errorCode')
+                error_desc = fault.detail.UPnPError.get('errorDescription')
+                faultstring = fault.get('faultstring')
+                
+                if error_desc or error_code:
+                    logger.warning("dlna %s %s UPnP error %s: %s",
+                                  self.device.name, action, error_code, error_desc)
+                elif faultstring:
+                    logger.warning("dlna %s %s SOAP Fault: %s",
+                                  self.device.name, action, faultstring)
+                else:
+                    logger.warning("dlna %s %s SOAP Fault (no details)", self.device.name, action)
+                
+                return 'handled'  # Valid SOAP Fault - don't retry
+        except Exception as e:
+            # Couldn't parse as SOAP Fault - treat as transient error, will retry
+            logger.debug("dlna %s %s HTTP 500 not parseable as SOAP Fault: %s", 
+                        self.device.name, action, str(e))
+        
+        return None  # Not a valid SOAP Fault - retry
+
     async def control(self, action: str, data: dict, client: aiohttp.ClientSession = None):
         headers = {
             'Content-type': 'text/xml',
@@ -226,9 +268,17 @@ class DlnaDeviceService(object):
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 async with client.post(self.control_url, data=payload.encode('utf8'), headers=headers, timeout=5) as response:
-                    # Check for 5xx errors that should be retried
+                    # Check for 5xx errors - may be a valid SOAP Fault (per UPnP spec)
                     if 500 <= response.status < 600:
-                        raise ServerErrorException(response.status, await response.text())
+                        response_text = await response.text()
+                        # Try to parse as SOAP Fault before retrying
+                        # UPnP spec mandates HTTP 500 for SOAP Faults
+                        soap_fault_result = self._try_parse_soap_fault(response_text, action)
+                        if soap_fault_result is not None:
+                            # Successfully parsed SOAP Fault - don't retry, return None
+                            return None
+                        # Not a parseable SOAP Fault - treat as transient error
+                        raise ServerErrorException(response.status, response_text)
                     # 4xx and other errors still raise immediately
                     if not response.ok:
                         raise Exception(f"service {self.control_url} {action} {response.status} {await response.text()}")
