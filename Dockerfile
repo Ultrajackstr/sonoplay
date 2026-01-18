@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY templates/ templates/
 COPY static/ static/
-COPY main.py logging_config.py ./
+COPY main.py logging_config.py version.py ./
 COPY plex/ plex/
 COPY dlna/ dlna/
 COPY settings/ settings/

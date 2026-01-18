@@ -1073,6 +1073,8 @@ class PlexDlnaAdapter(object):
         while True:
             try:
                 await self.update_plex_tv_connection()
+            except asyncio.TimeoutError:
+                logger.debug("Plex TV connection update timed out for %s", self.dlna.name)
             except Exception:
                 logger.exception("Unexpected error updating Plex TV connection")
             await asyncio.sleep(60)

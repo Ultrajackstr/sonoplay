@@ -164,11 +164,14 @@ class SubscribeManager(object):
             return
         params.update(pms_header(device))
         timeline_url = adapter.plex_lib.get_timeline()
-        async with g.http.get(timeline_url, params=params) as res:
-            try:
-                res.raise_for_status()
-            except Exception as e:
-                logger.error("notify server error: %s, %s, %s", e, res.content, params)
+        try:
+            async with g.http.get(timeline_url, params=params) as res:
+                try:
+                    res.raise_for_status()
+                except Exception as e:
+                    logger.error("notify server error: %s, %s, %s", e, res.content, params)
+        except asyncio.TimeoutError:
+            logger.debug("notify server timeout for %s", device.name)
 
     async def notify(self):
         await self.notify_server()
