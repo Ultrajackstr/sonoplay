@@ -305,12 +305,14 @@ class DlnaDeviceService(object):
                         logger.warning("dlna device control request error: %s", info.toDict())
                         return None
                     return info.Envelope.Body.get(f"{action}Response")
-            except ClientConnectionError as e:
+            except (ClientConnectionError, asyncio.TimeoutError) as e:
                 last_exception = e
                 if attempt < MAX_RETRIES:
-                    logger.debug("dlna %s %s connection error (attempt %d/%d), retrying: %s", 
-                                self.device.name, action, attempt, MAX_RETRIES, str(e))
-                    await asyncio.sleep(0.5)  # Brief delay for Samsung-style empty first response
+                    logger.debug("dlna %s %s %s (attempt %d/%d), retrying: %s", 
+                                self.device.name, action,
+                                "timeout" if isinstance(e, asyncio.TimeoutError) else "connection error",
+                                attempt, MAX_RETRIES, str(e))
+                    await asyncio.sleep(0.5)  # Brief delay before retry
                     continue
                 # All retries exhausted
                 logger.warning("dlna %s %s connection failed after %d attempts: %s",

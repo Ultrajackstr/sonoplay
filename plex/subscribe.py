@@ -142,7 +142,10 @@ class SubscribeManager(object):
     async def notify_server(self):
         target_devices = list(devices)
         target_devices.extend(list_virtual_devices())
-        await asyncio.gather(*[self.notify_server_device(device) for device in target_devices])
+        await asyncio.gather(
+            *[self.notify_server_device(device) for device in target_devices],
+            return_exceptions=True,
+        )
 
     async def notify_server_device(self, device, force=False):
         subs = self.subscribers.get(device.uuid, [])
@@ -172,6 +175,8 @@ class SubscribeManager(object):
                     logger.error("notify server error: %s, %s, %s", e, res.content, params)
         except asyncio.TimeoutError:
             logger.debug("notify server timeout for %s", device.name)
+        except Exception as e:
+            logger.warning("notify server failed for %s: %s", device.name, e)
 
     async def notify(self):
         await self.notify_server()
@@ -212,7 +217,13 @@ class SubscribeManager(object):
     async def notify_device_disconnected(self, device):
         subs = self.subscribers.get(device.uuid, [])
         await asyncio.gather(*[sub.send(TIMELINE_DISCONNECTED, device) for sub in subs])
-        asyncio.create_task(asyncio.gather(*[self.remove_subscriber(sub.uuid, target_uuid=device.uuid) for sub in subs]))
+        task = asyncio.create_task(
+            asyncio.gather(
+                *[self.remove_subscriber(sub.uuid, target_uuid=device.uuid) for sub in subs],
+                return_exceptions=True,
+            )
+        )
+        task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
 
     async def start(self):
         await self.notify()
