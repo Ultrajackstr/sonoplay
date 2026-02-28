@@ -36,7 +36,8 @@ def atomic_write_json(path: Path, data: dict) -> None:
     """Write JSON data atomically using temp file + rename.
     
     This prevents data corruption if the process is killed or crashes
-    during a write operation.
+    during a write operation.  Falls back to direct write if the temp
+    file cannot be created (e.g. directory owned by root in Docker).
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +53,18 @@ def atomic_write_json(path: Path, data: dict) -> None:
         
         # Atomic rename (works on POSIX, overwrites target if exists)
         os.replace(temp_path, path)
+    except PermissionError:
+        # Fallback: direct write when we lack directory write permission
+        # (e.g. Docker volume owned by root, app running as non-root user)
+        logger.warning(
+            "Cannot create temp file for atomic write in %s "
+            "(permission denied). Falling back to direct write.",
+            path.parent,
+        )
+        with open(path, mode="w") as f:
+            json.dump(data, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
     except Exception:
         # Clean up temp file on failure
         if temp_path.exists():
