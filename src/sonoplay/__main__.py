@@ -1,12 +1,12 @@
-"""Entry point for python -m sonoplex."""
+"""Entry point for python -m sonoplay."""
 
 import sys
 
 
 def main():
-    """Start the Sonoplex server."""
+    """Start the Sonoplay server."""
     # Configure logging first using new module location
-    from sonoplex.core.logging import configure_logging
+    from sonoplay.core.logging import configure_logging
     configure_logging()
     
     # Import and start - still uses old plexserver for now

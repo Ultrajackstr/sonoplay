@@ -1,5 +1,5 @@
 /**
- * SonoPlex Landing Page JavaScript
+ * SonoPlay Landing Page JavaScript
  */
 document.addEventListener('DOMContentLoaded', () => {
   // ========================================

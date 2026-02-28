@@ -189,14 +189,14 @@ class PlayQueue(object):
         encoded_path = quote(f'/library/metadata/{rating_key}', safe='')
         
         # Generate a unique session ID for this transcode request
-        session_id = f"sonoplex-{uuid.uuid4().hex[:8]}"
+        session_id = f"sonoplay-{uuid.uuid4().hex[:8]}"
         
         # Get client identifier from plex_lib if available
         client_id = getattr(self.plex_lib, 'client_identifier', None)
         if not client_id and hasattr(self.plex_lib, 'device') and self.plex_lib.device:
-            client_id = getattr(self.plex_lib.device, 'uuid', 'sonoplex-default')
+            client_id = getattr(self.plex_lib.device, 'uuid', 'sonoplay-default')
         if not client_id:
-            client_id = 'sonoplex-default'
+            client_id = 'sonoplay-default'
         
         # Build query with required parameters for Plex transcode
         query_parts = [

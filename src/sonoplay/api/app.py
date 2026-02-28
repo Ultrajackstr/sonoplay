@@ -1,4 +1,4 @@
-"""FastAPI application factory for Sonoplex."""
+"""FastAPI application factory for Sonoplay."""
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
         Configured FastAPI instance with routes and middleware
     """
     app = FastAPI(
-        title="Sonoplex",
+        title="Sonoplay",
         description="Plex DLNA Player - Bridge Plex to DLNA/UPnP speakers",
         version="1.0.0",
     )
@@ -29,7 +29,7 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     
     # Register routers
-    from sonoplex.api.routes.health import router as health_router, set_startup_time
+    from sonoplay.api.routes.health import router as health_router, set_startup_time
     app.include_router(health_router)
     
     @app.on_event("startup")

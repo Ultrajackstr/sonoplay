@@ -76,7 +76,7 @@ datastore = None
 class Settings(BaseSettings):
     http_port: int = 32488
     host_ip: str | None = None
-    product: str = "SonoPlex Player"
+    product: str = "SonoPlay"
     aliases: str = ""
     location_url: str | None = None
     version: str = "1"

@@ -1,14 +1,14 @@
 services:
-  sonoplex:
+  sonoplay:
     build: .
-    container_name: sonoplex
+    container_name: sonoplay
     network_mode: host
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     volumes:
-      - sonoplex-config:/config
+      - sonoplay-config:/config
 
 volumes:
-  sonoplex-config:
+  sonoplay-config:

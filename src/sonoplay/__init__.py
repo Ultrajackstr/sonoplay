@@ -1,4 +1,4 @@
-"""Sonoplex - Plex DLNA Player.
+"""Sonoplay - Plex DLNA Player.
 
 Bridge Plex media playback to DLNA/UPnP speakers and receivers.
 """

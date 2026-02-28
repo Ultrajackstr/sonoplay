@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="SonoPlex - Cast Plexamp to DLNA speakers. Bridge your Plexamp music to any DLNA-compatible speaker in your home.">
-  <title>SonoPlex - Cast Plexamp to DLNA Speakers</title>
+  <meta name="description" content="SonoPlay - Cast Plexamp to DLNA speakers. Bridge your Plexamp music to any DLNA-compatible speaker in your home.">
+  <title>SonoPlay - Cast Plexamp to DLNA Speakers</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
     <div class="container nav-container">
       <a href="#home" class="logo">
         <span class="logo-icon">🔊</span>
-        <span>SONOPLEX</span>
+        <span>SONOPLAY</span>
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation">
         <span></span>
@@ -27,7 +27,7 @@
         <li><a href="#install">Install</a></li>
         <li><a href="#support">Support</a></li>
       </ul>
-      <a href="https://github.com/aquantumofdonuts/SonoPlex" class="nav-github" target="_blank" rel="noopener" aria-label="View on GitHub">
+      <a href="https://github.com/aquantumofdonuts/SonoPlay" class="nav-github" target="_blank" rel="noopener" aria-label="View on GitHub">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
           <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
         </svg>
@@ -68,7 +68,7 @@
       <p class="hero-subtitle">Cast from Plexamp to any DLNA device on your network. No complicated setup. Just works.</p>
       <div class="hero-cta">
         <a href="#features" class="btn btn-primary">See How It Works</a>
-        <a href="https://github.com/aquantumofdonuts/SonoPlex" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+        <a href="https://github.com/aquantumofdonuts/SonoPlay" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
       </div>
     </div>
   </section>
@@ -107,10 +107,10 @@
     </div>
   </section>
 
-  <!-- Why SonoPlex -->
+  <!-- Why SonoPlay -->
   <section class="why">
     <div class="container">
-      <h2>Why SonoPlex?</h2>
+      <h2>Why SonoPlay?</h2>
       <div class="why-grid">
         <div class="why-card why-problem">
           <h3>😔 The Problem</h3>
@@ -120,10 +120,10 @@
         </div>
         <div class="why-card why-solution">
           <h3>🎵 The Solution</h3>
-          <p><strong>SonoPlex makes your DLNA speakers appear as Plex players.</strong></p>
+          <p><strong>SonoPlay makes your DLNA speakers appear as Plex players.</strong></p>
           <p>Cast from Plexamp to any DLNA device on your network.</p>
           <div class="why-flow">
-            <code>Plexamp → SonoPlex → Your Speakers</code>
+            <code>Plexamp → SonoPlay → Your Speakers</code>
           </div>
           <p>No complicated setup. No Raspberry Pi projects. <strong>Just works.</strong></p>
         </div>
@@ -206,8 +206,8 @@
         <button class="tab-btn" data-tab="unraid">Unraid</button>
       </div>
       <div class="tab-content active" id="tab-compose">
-        <pre><code>git clone --branch stable https://github.com/aquantumofdonuts/sonoplex.git
-cd sonoplex
+        <pre><code>git clone --branch stable https://github.com/aquantumofdonuts/sonoplay.git
+cd sonoplay
 docker compose up -d
 
 # Access at http://your-server:32488</code></pre>
@@ -218,11 +218,11 @@ docker compose up -d
       </div>
       <div class="tab-content" id="tab-run">
         <pre><code>docker run -d \
-  --name sonoplex \
+  --name sonoplay \
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/sonoplex:stable</code></pre>
+  ghcr.io/aquantumofdonuts/sonoplay:stable</code></pre>
         <button class="copy-btn" data-target="tab-run">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           <span>Copy</span>
@@ -234,7 +234,7 @@ docker compose up -d
         </div>
       </div>
       <p class="install-requirements">Requirements: Docker, Plex server</p>
-      <a href="https://github.com/aquantumofdonuts/SonoPlex#readme" class="btn btn-secondary" target="_blank" rel="noopener">View Full Documentation</a>
+      <a href="https://github.com/aquantumofdonuts/SonoPlay#readme" class="btn btn-secondary" target="_blank" rel="noopener">View Full Documentation</a>
     </div>
   </section>
 
@@ -243,12 +243,12 @@ docker compose up -d
     <div class="container">
       <h2>Support</h2>
       <div class="support-grid">
-        <a href="https://github.com/aquantumofdonuts/SonoPlex/wiki" class="support-card" target="_blank" rel="noopener">
+        <a href="https://github.com/aquantumofdonuts/SonoPlay/wiki" class="support-card" target="_blank" rel="noopener">
           <span class="support-icon">📖</span>
           <h3>Wiki</h3>
           <p>Docs and guides on GitHub</p>
         </a>
-        <a href="https://github.com/aquantumofdonuts/SonoPlex/issues" class="support-card" target="_blank" rel="noopener">
+        <a href="https://github.com/aquantumofdonuts/SonoPlay/issues" class="support-card" target="_blank" rel="noopener">
           <span class="support-icon">🐛</span>
           <h3>GitHub Issues</h3>
           <p>Report bugs and feature requests</p>
@@ -260,13 +260,13 @@ docker compose up -d
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
-      <p>© 2026 SonoPlex. Open source under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GPLv3 License</a>.</p>
+      <p>© 2026 SonoPlay. Open source under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GPLv3 License</a>.</p>
       <div class="footer-links">
-        <a href="https://github.com/aquantumofdonuts/SonoPlex" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/aquantumofdonuts/SonoPlay" target="_blank" rel="noopener">GitHub</a>
         <span>·</span>
-        <a href="https://github.com/aquantumofdonuts/SonoPlex/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/aquantumofdonuts/SonoPlay/releases" target="_blank" rel="noopener">Releases</a>
         <span>·</span>
-        <a href="https://github.com/aquantumofdonuts/SonoPlex/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/aquantumofdonuts/SonoPlay/issues" target="_blank" rel="noopener">Issues</a>
       </div>
     </div>
   </footer>

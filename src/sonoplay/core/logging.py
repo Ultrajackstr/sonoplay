@@ -1,4 +1,4 @@
-"""Centralized logging configuration for Sonoplex."""
+"""Centralized logging configuration for Sonoplay."""
 
 import logging
 import sys

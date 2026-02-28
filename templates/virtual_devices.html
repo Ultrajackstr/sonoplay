@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}SonoPlex - Groups{% endblock %}
+{% block title %}SonoPlay - Groups{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -544,7 +544,7 @@
                 method: 'GET',
                 headers: {
                     'X-Plex-Target-Client-Identifier': uuid,
-                    'X-Plex-Client-Identifier': 'sonoplex'
+                    'X-Plex-Client-Identifier': 'sonoplay'
                 }
             });
             if (!response.ok) throw new Error('Command failed');

@@ -1,4 +1,4 @@
-"""HTTP client management for Sonoplex."""
+"""HTTP client management for Sonoplay."""
 
 import aiohttp
 from typing import Optional

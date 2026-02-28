@@ -1,4 +1,4 @@
-"""Core infrastructure for Sonoplex."""
+"""Core infrastructure for Sonoplay."""
 
 from .config import Settings, settings, atomic_write_json, DEFAULT_STATS
 from .logging import configure_logging

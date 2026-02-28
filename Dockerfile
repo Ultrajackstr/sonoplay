@@ -24,7 +24,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Create non-root user
-RUN groupadd -r sonoplex && useradd -r -g sonoplex -d /app -s /sbin/nologin sonoplex
+RUN groupadd -r sonoplay && useradd -r -g sonoplay -d /app -s /sbin/nologin sonoplay
 
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
@@ -41,14 +41,20 @@ COPY utils/ utils/
 COPY src/ src/
 
 # Set ownership
-RUN chown -R sonoplex:sonoplex /app
+RUN chown -R sonoplay:sonoplay /app
+
+# Pre-create config directory with correct ownership so that
+# atomic_write_json can create temp files in it.
+# Must come BEFORE the VOLUME declaration so Docker preserves
+# the ownership when creating an empty volume at runtime.
+RUN mkdir -p /config && chown sonoplay:sonoplay /config
 
 ENV HTTP_PORT=32488 CONFIG_PATH=/config
 EXPOSE 1910/udp 32412/udp $HTTP_PORT
 VOLUME /config
 
 # Switch to non-root user
-USER sonoplex
+USER sonoplay
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${HTTP_PORT}/health')" || exit 1

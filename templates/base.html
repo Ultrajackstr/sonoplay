@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}SonoPlex{% endblock %}</title>
+    <title>{% block title %}SonoPlay{% endblock %}</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,7 +31,7 @@
                     <div class="nav-brand-icon">
                         <i class="fas fa-play"></i>
                     </div>
-                    <span>SonoPlex</span>
+                    <span>SonoPlay</span>
                 </a>
                 
                 <!-- Center Nav Links -->
@@ -489,9 +489,9 @@
             // Step 1: Welcome
             async stepWelcome() {
                 const result = await Swal.fire({
-                    title: 'Welcome to SonoPlex!',
+                    title: 'Welcome to SonoPlay!',
                     html: `
-                        <p style="margin-bottom: 1rem;">SonoPlex connects your Plex Media Server to DLNA/UPnP speakers and devices.</p>
+                        <p style="margin-bottom: 1rem;">SonoPlay connects your Plex Media Server to DLNA/UPnP speakers and devices.</p>
                         <p>Let's set up your first device in just a few steps.</p>
                     `,
                     icon: 'info',
@@ -900,7 +900,7 @@
                 await Swal.fire({
                     title: 'Setup Complete!',
                     html: `
-                        <p style="margin-bottom: 1rem;">You're all set to start streaming with SonoPlex.</p>
+                        <p style="margin-bottom: 1rem;">You're all set to start streaming with SonoPlay.</p>
                         <div style="text-align: left; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
                             <p style="margin: 0 0 0.5rem 0;"><strong>Quick Tips:</strong></p>
                             <ul style="margin: 0; padding-left: 1.25rem; color: #666;">
@@ -911,7 +911,7 @@
                         </div>
                     `,
                     icon: 'success',
-                    confirmButtonText: 'Start Using SonoPlex'
+                    confirmButtonText: 'Start Using SonoPlay'
                 });
                 
                 await this.markComplete();

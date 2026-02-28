@@ -235,7 +235,7 @@ class DlnaDeviceService(object):
             'Content-type': 'text/xml',
             'SOAPACTION': '"{}#{}"'.format(self.urn, action),
             'charset': 'utf-8',
-            'User-Agent': 'SonoPlex/1.0'
+            'User-Agent': 'SonoPlay/1.0'
         }
         if client is None:
             client = g.http
@@ -354,7 +354,7 @@ class DlnaDeviceService(object):
                 return
         headers = {
             'Cache-Control': 'no-cache',
-            'User-Agent': 'SonoPlex/1.0',
+            'User-Agent': 'SonoPlay/1.0',
             'NT': 'upnp:event',
             'Callback': '<http://' + settings.host_ip + ':' + str(settings.http_port) + '/dlna/callback/'
                         + self.device.uuid + '>',

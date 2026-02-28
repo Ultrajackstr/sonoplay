@@ -1,6 +1,6 @@
-"""COMPATIBILITY SHIM - Use sonoplex.core.logging instead."""
+"""COMPATIBILITY SHIM - Use sonoplay.core.logging instead."""
 
 # Re-export from new canonical location
-from sonoplex.core.logging import configure_logging
+from sonoplay.core.logging import configure_logging
 
 __all__ = ["configure_logging"]

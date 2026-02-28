@@ -1,8 +1,8 @@
-"""Version and startup banner for SonoPlex Player."""
+"""Version and startup banner for SonoPlay."""
 
 VERSION = "1.1.2"
 LICENSE = "GPL-3.0"
-PRODUCT = "SonoPlex Player"
+PRODUCT = "SonoPlay"
 
 
 def print_banner() -> None:
