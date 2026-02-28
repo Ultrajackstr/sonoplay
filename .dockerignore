@@ -20,3 +20,6 @@
 !utils/
 !templates/
 !static/
+
+# Exclude Python bytecache from whitelisted dirs
+**/__pycache__/
