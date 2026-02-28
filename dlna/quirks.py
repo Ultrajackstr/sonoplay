@@ -60,7 +60,7 @@ _quirks_cache: dict[str, dict[str, Any]] = {}
 
 def _match_pattern(pattern: str, value: str | None) -> bool:
     """Check if value matches pattern (case-insensitive regex)."""
-    if value is None:
+    if not isinstance(value, str):
         return False
     try:
         return bool(re.search(pattern, value, re.IGNORECASE))

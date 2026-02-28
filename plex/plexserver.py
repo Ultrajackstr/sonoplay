@@ -53,6 +53,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from plex import pin_login
 from datetime import datetime, timedelta, timezone
+from version import VERSION
 import aiohttp
 import time
 
@@ -230,7 +231,7 @@ async def health():
             "virtual": len(virtual_devs)
         },
         "subscribers": sum(len(subs) for subs in sub_man.subscribers.values()),
-        "version": "1.0.0"
+        "version": VERSION
     }
 
 
@@ -772,6 +773,8 @@ async def stop(request: Request,
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
+        if device is None:
+            raise HTTPException(404, f"device not found {target_uuid}")
         adapter = await adapter_by_device(device)
         await adapter.stop()
     return await build_response(XML_OK, target_uuid=target_uuid)
@@ -922,7 +925,7 @@ async def subscribe(request: Request,
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f"device not found {target_uuid}")
-    sub_man.add_subscriber(target_uuid, client_uuid, request.client.host, port, protocol=protocol, command_id=commandID)
+    await sub_man.add_subscriber(target_uuid, client_uuid, request.client.host, port, protocol=protocol, command_id=commandID)
     return await build_response(XML_OK, target_uuid=target_uuid)
 
 

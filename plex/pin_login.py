@@ -2,7 +2,12 @@ from dlna.dlna_device import DlnaDevice
 from utils import pms_header, xml2dict, g
 from settings import settings
 from datetime import datetime, timedelta, timezone
+import aiohttp
+import asyncio
+import logging
 import time
+
+logger = logging.getLogger(__name__)
 
 PINS = 'https://plex.tv/api/v2/pins'
 CHECKPINS = 'https://plex.tv/api/v2/pins/{pin_id}'
@@ -76,21 +81,29 @@ async def get_pin(device: DlnaDevice):
             return cached['pin'], cached['pin_id']
     
     # Generate new PIN
-    async with g.http.post(PINS, headers=pms_header(device)) as p:
-        p.raise_for_status()
-        d = xml2dict(await p.text())
-        pin_code = d.pin['@code']
-        pin_id = d.pin['@id']
-        
-        # Cache the PIN with added timestamp for LRU eviction
-        _pin_cache[device.uuid] = {
-            'pin': pin_code,
-            'pin_id': pin_id,
-            'expires': now + PIN_CACHE_DURATION,
-            'added': time.time()
-        }
-        
-        return pin_code, pin_id
+    try:
+        timeout = aiohttp.ClientTimeout(total=settings.http_timeout_plex_tv)
+        async with g.http.post(PINS, headers=pms_header(device), timeout=timeout) as p:
+            p.raise_for_status()
+            d = xml2dict(await p.text())
+            pin_code = d.pin['@code']
+            pin_id = d.pin['@id']
+            
+            # Cache the PIN with added timestamp for LRU eviction
+            _pin_cache[device.uuid] = {
+                'pin': pin_code,
+                'pin_id': pin_id,
+                'expires': now + PIN_CACHE_DURATION,
+                'added': time.time()
+            }
+            
+            return pin_code, pin_id
+    except asyncio.TimeoutError:
+        logger.warning("Timeout getting PIN from plex.tv for %s", device.name)
+        raise
+    except Exception as e:
+        logger.warning("Error getting PIN from plex.tv for %s: %s", device.name, e)
+        raise
 
 
 def clear_pin_cache(uuid: str):
@@ -100,9 +113,17 @@ def clear_pin_cache(uuid: str):
 
 
 async def check_pin(pin_id, device: DlnaDevice):
-    async with g.http.get(CHECKPINS.format(pin_id=pin_id), headers=pms_header(device)) as p:
-        if p.status == 404:
-            return None
-        p.raise_for_status()
-        d = xml2dict(await p.text())
-        return d.pin['@authToken']
+    try:
+        timeout = aiohttp.ClientTimeout(total=settings.http_timeout_plex_tv)
+        async with g.http.get(CHECKPINS.format(pin_id=pin_id), headers=pms_header(device), timeout=timeout) as p:
+            if p.status == 404:
+                return None
+            p.raise_for_status()
+            d = xml2dict(await p.text())
+            return d.pin['@authToken']
+    except asyncio.TimeoutError:
+        logger.warning("Timeout checking PIN with plex.tv for %s", device.name)
+        return None
+    except Exception as e:
+        logger.warning("Error checking PIN with plex.tv for %s: %s", device.name, e)
+        return None

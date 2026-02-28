@@ -24,8 +24,12 @@ from datetime import datetime, timezone
 import json
 import logging
 import os
+import threading
 
 logger = logging.getLogger(__name__)
+
+# Lock for thread-safe read-modify-write on data file
+_data_lock = threading.RLock()
 
 
 def atomic_write_json(path: Path, data: dict) -> None:
@@ -123,45 +127,49 @@ class Settings(BaseSettings):
         return name
 
     def save_dlna_name_alias(self, uuid, alias):
-        data = self.load_data()
-        info = data.get(uuid, {})
-        info['alias'] = alias
-        data[uuid] = info
-        self.save_data(data)
+        with _data_lock:
+            data = self.load_data()
+            info = data.get(uuid, {})
+            info['alias'] = alias
+            data[uuid] = info
+            self.save_data(data)
 
     def load_data(self):
-        cache = getattr(self, "_data_cache", None)
-        if cache is not None:
-            return cache
-        p = Path(self.config_path).joinpath(self.data_file_name)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        if not p.exists():
-            object.__setattr__(self, "_data_cache", {})
-            return self._data_cache
-        try:
-            with open(p) as f:
-                j = json.load(f)
-                object.__setattr__(self, "_data_cache", j)
+        with _data_lock:
+            cache = getattr(self, "_data_cache", None)
+            if cache is not None:
+                return cache
+            p = Path(self.config_path).joinpath(self.data_file_name)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            if not p.exists():
+                object.__setattr__(self, "_data_cache", {})
                 return self._data_cache
-        except Exception:
-            object.__setattr__(self, "_data_cache", {})
-            return self._data_cache
+            try:
+                with open(p) as f:
+                    j = json.load(f)
+                    object.__setattr__(self, "_data_cache", j)
+                    return self._data_cache
+            except Exception:
+                object.__setattr__(self, "_data_cache", {})
+                return self._data_cache
 
     def save_data(self, data):
-        p = Path(self.config_path).joinpath(self.data_file_name)
-        atomic_write_json(p, data)
-        object.__setattr__(self, "_data_cache", data)
+        with _data_lock:
+            p = Path(self.config_path).joinpath(self.data_file_name)
+            atomic_write_json(p, data)
+            object.__setattr__(self, "_data_cache", data)
 
     def get_token_for_uuid(self, uuid):
         d = self.load_data()
         return d.get(uuid, {}).get("token", None)
 
     def set_token_for_uuid(self, uuid, token):
-        d = self.load_data()
-        info = d.get(uuid, {})
-        info['token'] = token
-        d[uuid] = info
-        self.save_data(d)
+        with _data_lock:
+            d = self.load_data()
+            info = d.get(uuid, {})
+            info['token'] = token
+            d[uuid] = info
+            self.save_data(d)
 
     def get_device_stats(self, uuid):
         data = self.load_data()
@@ -172,15 +180,18 @@ class Settings(BaseSettings):
         return merged
 
     def _mutate_device_stats(self, uuid, mutator):
-        data = self.load_data()
-        info = data.get(uuid, {})
-        stats = info.get("stats", {})
-        merged = DEFAULT_STATS.copy()
-        merged.update(stats)
-        mutator(merged)
-        info['stats'] = merged
-        data[uuid] = info
-        self.save_data(data)
+        with _data_lock:
+            # Bypass cache to get fresh data under lock
+            object.__setattr__(self, "_data_cache", None)
+            data = self.load_data()
+            info = data.get(uuid, {})
+            stats = info.get("stats", {})
+            merged = DEFAULT_STATS.copy()
+            merged.update(stats)
+            mutator(merged)
+            info['stats'] = merged
+            data[uuid] = info
+            self.save_data(data)
 
     def update_device_stats(self, uuid, **kwargs):
         def mutator(stats):

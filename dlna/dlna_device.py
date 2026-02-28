@@ -55,9 +55,6 @@ ERROR_COUNT_TO_REMOVE = 20
 MAX_RETRIES = 3
 
 
-import re
-
-
 class ServerErrorException(Exception):
     """Raised for HTTP 5xx errors that should be retried."""
     def __init__(self, status: int, body: str):
@@ -238,7 +235,7 @@ class DlnaDeviceService(object):
             'Content-type': 'text/xml',
             'SOAPACTION': '"{}#{}"'.format(self.urn, action),
             'charset': 'utf-8',
-            'User-Agent': '{}/{}'.format(__file__, '1.0')
+            'User-Agent': 'SonoPlex/1.0'
         }
         if client is None:
             client = g.http
@@ -357,7 +354,7 @@ class DlnaDeviceService(object):
                 return
         headers = {
             'Cache-Control': 'no-cache',
-            'User-Agent': '{}/{}'.format(__file__, '1.0'),
+            'User-Agent': 'SonoPlex/1.0',
             'NT': 'upnp:event',
             'Callback': '<http://' + settings.host_ip + ':' + str(settings.http_port) + '/dlna/callback/'
                         + self.device.uuid + '>',
@@ -417,6 +414,7 @@ class DlnaDevice(object):
     def __init__(self, location_url):
         self.location_url = location_url
         self.name = None
+        self.manufacturer = None
         self.model = None
         self.ip = None
         self.info = None
@@ -440,6 +438,7 @@ class DlnaDevice(object):
             if self.info:
                 device_info = self.info['device']
                 self.name = as_text(device_info.get('friendlyName'))
+                self.manufacturer = as_text(device_info.get('manufacturer'))
                 model_desc = device_info.get('modelDescription', settings.product)
                 self.model = as_text(model_desc, settings.product)
                 udn = as_text(device_info.get('UDN'))
@@ -508,11 +507,13 @@ class DlnaDevice(object):
         return None
 
     def __getattr__(self, item):
-        def action(data: dict = {}, client: aiohttp.ClientSession = None):
-            return self.action(item, data=data, client=client)
+        def action(data: dict = None, client: aiohttp.ClientSession = None):
+            return self.action(item, data=data if data is not None else {}, client=client)
         return action
 
-    async def action(self, action: str, data: dict = {}, service_type: str = None, client: aiohttp.ClientSession = None):
+    async def action(self, action: str, data: dict = None, service_type: str = None, client: aiohttp.ClientSession = None):
+        if data is None:
+            data = {}
         await self.get_data()
         service = None
         if service_type is not None:

@@ -101,7 +101,7 @@ class SubscribeManager(object):
         if s is not None:
             s.command_id = command_id
 
-    def add_subscriber(self,
+    async def add_subscriber(self,
                        target_uuid: str,
                        client_uuid: str,
                        host: str,
@@ -112,7 +112,7 @@ class SubscribeManager(object):
         s = self.get_subscriber(target_uuid, client_uuid)
         if s is not None:
             if s.host != host or s.port != port or s.protocol != protocol:
-                self.remove_subscriber(s.uuid)
+                await self.remove_subscriber(s.uuid)
             else:
                 s.command_id = command_id
                 return
@@ -172,7 +172,8 @@ class SubscribeManager(object):
                 try:
                     res.raise_for_status()
                 except Exception as e:
-                    logger.error("notify server error: %s, %s, %s", e, res.content, params)
+                    body = await res.text()
+                    logger.error("notify server error: %s, %s, %s", e, body, params)
         except asyncio.TimeoutError:
             logger.debug("notify server timeout for %s", device.name)
         except Exception as e:
@@ -262,6 +263,8 @@ class SubscribeManager(object):
 
 class Subscriber(object):
 
+    MAX_SEND_ERRORS = 3
+
     def __init__(self, uuid, host, port, manager: SubscribeManager, protocol: str = "http", command_id: int = 0):
         self.uuid = uuid
         self.host = host
@@ -271,18 +274,31 @@ class Subscriber(object):
         self.url = f"{protocol}://{host}:{port}/:/timeline"
         self.manager = manager
         self.last_seen = datetime.now(timezone.utc)
+        self.consecutive_errors = 0
 
     async def send(self, msg: str, device):
         msg = msg.format(command_id=self.command_id)
         response = None
-        # print(f"sub send {self.host} {msg}")
         try:
             async with g.http.post(self.url, data=msg, headers=subscriber_send_headers(device),
                                    timeout=1) as response:
                 response.raise_for_status()
+                self.consecutive_errors = 0
         except Exception as e:
-            logger.warning("subscriber send error %s: %s, %s", self, e, await response.text() if response is not None else 'None')
-            await self.manager.remove_subscriber(self.uuid)
+            self.consecutive_errors += 1
+            resp_text = 'None'
+            if response is not None:
+                try:
+                    resp_text = await response.text()
+                except Exception:
+                    resp_text = '<unreadable>'
+            if self.consecutive_errors >= self.MAX_SEND_ERRORS:
+                logger.warning("subscriber %s evicted after %d consecutive errors: %s, %s",
+                               self, self.consecutive_errors, e, resp_text)
+                await self.manager.remove_subscriber(self.uuid)
+            else:
+                logger.debug("subscriber send error %s (attempt %d/%d): %s",
+                             self, self.consecutive_errors, self.MAX_SEND_ERRORS, e)
 
     def __eq__(self, other):
         return self.uuid == other.uuid

@@ -71,11 +71,18 @@ def get_protocol(discover):
                 await asyncio.sleep(SEND_INTERVAL_SECS)
 
         def datagram_received(self, data, addr):
-            info = [a.split(":", 1)
-                    for a in data.decode("UTF-8").split("\r\n")[1:]]
-            device = dict([(a[0].strip().lower(), a[1].strip())
-                           for a in info if len(a) >= 2])
-            asyncio.create_task(discover.on_new_device(device['location']))
+            try:
+                info = [a.split(":", 1)
+                        for a in data.decode("UTF-8").split("\r\n")[1:]]
+                device = dict([(a[0].strip().lower(), a[1].strip())
+                               for a in info if len(a) >= 2])
+            except (UnicodeDecodeError, ValueError) as e:
+                logger.debug("SSDP parse error from %s: %s", addr, e)
+                return
+            location = device.get('location')
+            if not location:
+                return
+            asyncio.create_task(discover.on_new_device(location))
 
         def error_received(self, exc):
             logger.error("Error received: %s", exc)
@@ -97,6 +104,14 @@ class DlnaDiscover(object):
         self._pending_locations = set()
         self._recently_seen_locations = {}  # location -> timestamp
 
+    def _cleanup_recently_seen(self):
+        """Remove entries older than throttle window to prevent unbounded growth."""
+        now = time.time()
+        expired = [loc for loc, ts in self._recently_seen_locations.items()
+                   if (now - ts) >= RECENTLY_SEEN_THROTTLE_SECS * 2]
+        for loc in expired:
+            del self._recently_seen_locations[loc]
+
     async def on_new_device(self, location_url):
         if not location_url:
             return
@@ -108,6 +123,10 @@ class DlnaDiscover(object):
         last_seen = self._recently_seen_locations.get(location_url)
         if last_seen is not None and (now - last_seen) < RECENTLY_SEEN_THROTTLE_SECS:
             return
+        
+        # Periodic cleanup to prevent unbounded growth
+        if len(self._recently_seen_locations) > 100:
+            self._cleanup_recently_seen()
         
         self._pending_locations.add(location_url)
         self._recently_seen_locations[location_url] = now

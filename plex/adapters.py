@@ -241,10 +241,17 @@ class DlnaState(object):
 
     def __getattr__(self, item):
         if item in DlnaState.changing_attrs:
-            self.last_access_time = datetime.now(timezone.utc)
-            self._wakeup_loop()
             return object.__getattribute__(self, "_" + item)
         return object.__getattribute__(self, item)
+
+    def touch_access_time(self):
+        """Explicitly mark that a client is actively using this device's state.
+        
+        Call this from adapter code when handling user-initiated actions
+        (polling, playback control) to keep the state loop running at high frequency.
+        """
+        self.last_access_time = datetime.now(timezone.utc)
+        self._wakeup_loop()
 
     def __del__(self):
         self._thread_should_stop = True
@@ -792,6 +799,7 @@ class PlexDlnaAdapter(object):
         self._update_stats(changed_state)
 
     async def wait_for_event(self, timeout=None, interesting_fields=None):
+        self.state.touch_access_time()
         event = asyncio.Event()
         entry = dict(event=event, interesting_fields=interesting_fields)
         self.wait_state_change_events.append(entry)
@@ -853,6 +861,7 @@ class PlexDlnaAdapter(object):
         }
 
     async def play_media(self, container_key, key=None, offset=0, paused=False, query_params: QueryParams = None):
+        self.state.touch_access_time()
         if query_params is not None:
             self.plex_lib.update(query_params)
 
@@ -1067,7 +1076,10 @@ class PlexDlnaAdapter(object):
         return mute.CurrentMute
 
     def start_plex_tv_notify(self):
-        asyncio.create_task(self._update_plex_tv_connection_loop())
+        self._plex_tv_task = asyncio.create_task(
+            self._update_plex_tv_connection_loop(),
+            name=f"plex_tv_notify_{self.dlna.name}"
+        )
 
     async def _update_plex_tv_connection_loop(self):
         while True:

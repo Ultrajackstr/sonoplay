@@ -226,7 +226,12 @@ def convert_volume(value: int, from_max: int, from_min: int, to_max: int, to_min
         return value
     if from_max - from_min == to_max - to_min:
         return value - from_min + to_min
-    percent = float(value - from_min) / float(from_max - from_min)
+    from_range = from_max - from_min
+    if from_range == 0:
+        return to_min
+    if to_step == 0:
+        to_step = 1
+    percent = float(value - from_min) / float(from_range)
     value = percent * (to_max - to_min)
     value = int(value / to_step)
     value += to_min
