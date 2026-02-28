@@ -1,75 +1,22 @@
-# Git
-.git/
-.gitignore
-.github/
-.worktrees/
+# ── Deny everything by default ──
+*
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg
-*.egg-info/
-dist/
-build/
-eggs/
+# ── Whitelist only what the build needs ──
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-.python-version
+# Build-stage: dependency install
+!pyproject.toml
+!requirements.txt
 
-# Testing
-tests/
-.pytest_cache/
-pytest_cache/
-pytest.ini
-.coverage
-htmlcov/
-.tox/
-.nox/
+# Build-stage: package install
+!src/
 
-# IDE / Editors
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Environment & secrets
-.env
-.env.*
-*.pem
-*.key
-secrets/
-
-# Documentation
-docs/
-*.md
-!README.md
-LICENSE
-
-# Project-specific (runtime data - mounted as volumes)
-config/
-data/
-temp/
-
-# Logs
-*.log
-logs/
-
-# Docker files (not needed in image)
-docker-compose*.yml
-Dockerfile
-
-# Misc
-.editorconfig
-Makefile
+# Runtime: application code
+!main.py
+!logging_config.py
+!version.py
+!plex/
+!dlna/
+!settings/
+!utils/
+!templates/
+!static/

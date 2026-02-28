@@ -1,7 +1,8 @@
-# Ignore generated docs but keep plans
+# ── Documentation & Tests (managed outside repo) ──
 docs/
+tests/
 
-# Python
+# ── Python artifacts ──
 __pycache__/
 *.py[cod]
 *$py.class
@@ -15,14 +16,14 @@ eggs/
 *.manifest
 *.spec
 
-# Virtual environments
+# ── Virtual environments ──
 .venv/
 venv/
 ENV/
 env/
 .python-version
 
-# Testing
+# ── Testing artifacts ──
 .pytest_cache/
 pytest_cache/
 pytest.ini
@@ -31,41 +32,43 @@ htmlcov/
 .tox/
 .nox/
 
-# IDE / Editors
+# ── IDE / Editors ──
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# OS files
+# ── OS files ──
 .DS_Store
 Thumbs.db
 
-# Environment & secrets
+# ── Environment & secrets ──
 .env
 .env.local
 *.pem
 *.key
 secrets/
 
-# Project-specific
+# ── Runtime data (mounted as volumes) ──
 config/
 data/
 temp/
-start.sh
 
-# GitHub - ignore local customizations but track workflows
+# ── GitHub (track workflows only) ──
 .github/
 !.github/workflows/
 
-# Git worktrees
+# ── Git worktrees ──
 .worktrees/
 
-# Logs
+# ── Logs ──
 *.log
 logs/
 
-# Docker
+# ── Docker overrides ──
 docker-compose.override.yml
+
+# ── Misc loose root files ──
+start.sh
 .git.bak/
