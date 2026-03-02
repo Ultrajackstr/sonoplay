@@ -63,6 +63,7 @@ import time
 # 1. The app runs on a home network behind NAT/firewall
 # 2. DLNA devices require direct network access anyway
 # 3. Plex authentication provides the main security boundary
+
 # If exposing to untrusted networks, add CORS middleware.
 
 XML_HEADER = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -100,6 +101,21 @@ class AudioSettingsUpdate(BaseModel):
 plex_server = FastAPI()
 s = plex_server
 plex_server.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# Global handler: when a DLNA device becomes unreachable mid-request,
+# return 503 instead of letting the unhandled exception produce a 500.
+from aiohttp import ClientConnectionError  # noqa: E402
+
+
+@s.exception_handler(ClientConnectionError)
+async def handle_device_unreachable(request: Request, exc: ClientConnectionError):
+    logger.warning("device unreachable during request %s: %s", request.url.path, exc)
+    return Response(
+        content='<Response code="503" status="Device unreachable"/>',
+        status_code=503,
+        media_type="text/xml",
+    )
 
 
 def format_ms_to_hms(ms: int):

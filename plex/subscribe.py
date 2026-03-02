@@ -218,12 +218,14 @@ class SubscribeManager(object):
     async def notify_device_disconnected(self, device):
         subs = self.subscribers.get(device.uuid, [])
         await asyncio.gather(*[sub.send(TIMELINE_DISCONNECTED, device) for sub in subs])
-        task = asyncio.create_task(
-            asyncio.gather(
+        # Remove subscribers in background — await the gather wrapped in a coroutine
+        # (asyncio.gather returns a Future, which create_task rejects)
+        async def _cleanup():
+            await asyncio.gather(
                 *[self.remove_subscriber(sub.uuid, target_uuid=device.uuid) for sub in subs],
                 return_exceptions=True,
             )
-        )
+        task = asyncio.create_task(_cleanup())
         task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
 
     async def start(self):
