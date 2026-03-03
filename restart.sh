@@ -12,4 +12,4 @@ sudo docker compose -f docker-compose.yaml up -d
 
 sleep 15
 
-sudo docker compose -f docker-compose.yaml logs
+sudo docker compose -f docker-compose.yaml logs -f
