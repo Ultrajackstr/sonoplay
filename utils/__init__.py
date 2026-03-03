@@ -81,7 +81,8 @@ g = G()
 
 
 def unescape_xml(xml):
-    return xml.decode().replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+    from html import unescape
+    return unescape(xml.decode())
 
 
 def xml2dict(xml):
