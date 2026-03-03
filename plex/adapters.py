@@ -62,6 +62,10 @@ async def remove_adapter(adapter):
     """Remove an adapter and clean up its resources."""
     async with _adapters_lock:
         if adapter.dlna.uuid in adapters:
+            # Cancel the Plex.tv registration task
+            plex_tv_task = getattr(adapter, '_plex_tv_task', None)
+            if plex_tv_task is not None and not plex_tv_task.done():
+                plex_tv_task.cancel()
             # Shutdown the state thread before removing
             if hasattr(adapter, 'state') and adapter.state is not None:
                 adapter.state.shutdown()
@@ -1083,14 +1087,19 @@ class PlexDlnaAdapter(object):
         )
 
     async def _update_plex_tv_connection_loop(self):
-        while True:
-            try:
-                await self.update_plex_tv_connection()
-            except asyncio.TimeoutError:
-                logger.debug("Plex TV connection update timed out for %s", self.dlna.name)
-            except Exception:
-                logger.exception("Unexpected error updating Plex TV connection")
-            await asyncio.sleep(60)
+        try:
+            while True:
+                try:
+                    await self.update_plex_tv_connection()
+                except asyncio.CancelledError:
+                    raise
+                except asyncio.TimeoutError:
+                    logger.debug("Plex TV connection update timed out for %s", self.dlna.name)
+                except Exception:
+                    logger.exception("Unexpected error updating Plex TV connection")
+                await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            logger.debug("Plex TV connection loop cancelled for %s", self.dlna.name)
 
     async def update_plex_tv_connection(self):
         if not settings.host_ip:

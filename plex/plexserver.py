@@ -145,7 +145,10 @@ async def on_new_dlna_device(location_url):
     adapter.start_plex_tv_notify()
     gdm = PlexGDM(device)
     gdm.run()
+    _gdm_instances.append(gdm)
 
+
+_gdm_instances: list = []
 
 dlna_discover = DlnaDiscover(on_new_dlna_device)
 
@@ -226,6 +229,13 @@ async def on_startup():
 async def on_shutdown():
     await sub_man.stop_cleanup_task()
     sub_man.stop()
+    # Stop all GDM instances to release UDP sockets
+    for gdm in _gdm_instances:
+        try:
+            gdm.stop()
+        except Exception:
+            logger.debug("Error stopping GDM instance", exc_info=True)
+    _gdm_instances.clear()
     stop_tasks = []
     for device in devices:
         adapter = await adapter_by_device(device)
