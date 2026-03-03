@@ -3,10 +3,6 @@
 {% block title %}SonoPlay - Devices{% endblock %}
 
 {% block extra_head %}
-<!-- Day.js for time formatting -->
-<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/duration.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/relativeTime.min.js"></script>
 <style>
     /* Icon button styles */
     .icon-btn {
@@ -68,10 +64,6 @@
 
 {% block scripts %}
 <script>
-    // Initialize Day.js plugins
-    dayjs.extend(window.dayjs_plugin_duration);
-    dayjs.extend(window.dayjs_plugin_relativeTime);
-
     // Device cache
     let lastFetchedDevices = [];
 
