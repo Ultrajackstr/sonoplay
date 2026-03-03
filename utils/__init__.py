@@ -100,12 +100,13 @@ def xml2dict(xml):
     return DotMap(parsed)
 
 
-def pms_header(device):
+def _base_plex_headers(device) -> dict:
+    """Build common Plex protocol headers shared by all header functions."""
     product = settings.product or device.model
     device_model = settings.client_model or device.model or product
     device_header = settings.client_device or device_model
     device_name = getattr(device, "name", None) or settings.client_device_name or product
-    return {
+    headers = {
         'X-Plex-Client-Identifier': device.uuid,
         'X-Plex-Device': device_header,
         'X-Plex-Device-Name': device_name,
@@ -114,53 +115,38 @@ def pms_header(device):
         'X-Plex-Product': product,
         'X-Plex-Version': settings.version,
         'X-Plex-Model': device_model,
-        'X-Plex-Provides': 'player,pubsub-player',
-        **({'X-Plex-Client-Profile-Name': settings.client_profile} if settings.client_profile else {})
     }
+    if settings.client_profile:
+        headers['X-Plex-Client-Profile-Name'] = settings.client_profile
+    return headers
+
+
+def pms_header(device):
+    headers = _base_plex_headers(device)
+    headers['X-Plex-Provides'] = 'player,pubsub-player'
+    return headers
 
 
 def plex_server_response_headers(device):
-    product = settings.product or device.model
-    device_model = settings.client_model or device.model or product
-    device_header = settings.client_device or device_model
-    device_name = getattr(device, "name", None) or settings.client_device_name or product
-    return {
+    headers = _base_plex_headers(device)
+    headers.update({
         'Accept': '*/*',
         'Connection': 'keep-alive',
         'Accept-Language': 'en',
-        'X-Plex-Device': device_header,
-        'X-Plex-Platform': settings.platform,
-        'X-Plex-Platform-Version': settings.platform_version,
-        'X-Plex-Product': product,
-        'X-Plex-Version': settings.version,
-        'X-Plex-Client-Identifier': device.uuid,
-        'X-Plex-Device-Name': device_name,
-        'X-Plex-Model': device_model,
         'X-Plex-Provides': 'player,pubsub-player',
-        **({'X-Plex-Client-Profile-Name': settings.client_profile} if settings.client_profile else {})
-    }
+    })
+    return headers
 
 
 def subscriber_send_headers(device):
-    product = settings.product or device.model
-    device_model = settings.client_model or device.model or product
-    device_header = settings.client_device or device_model
-    device_name = getattr(device, "name", None) or settings.client_device_name or product
-    return {
+    headers = _base_plex_headers(device)
+    headers.update({
         'Content-Type': 'application/xml',
         'Connection': 'Keep-Alive',
-        'X-Plex-Client-Identifier': device.uuid,
-        'X-Plex-Platform': settings.platform,
-        'X-Plex-Platform-Version': settings.platform_version,
-        'X-Plex-Product': product,
-        'X-Plex-Version': settings.version,
-        'X-Plex-Device': device_header,
-        'X-Plex-Device-Name': device_name,
-        'X-Plex-Model': device_model,
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en,*',
-        **({'X-Plex-Client-Profile-Name': settings.client_profile} if settings.client_profile else {})
-    }
+    })
+    return headers
 
 
 def timeline_poll_headers(device):
