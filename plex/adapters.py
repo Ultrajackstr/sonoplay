@@ -58,13 +58,14 @@ async def adapter_by_device(device, query_params: QueryParams = None):
         return a
 
 
-def remove_adapter(adapter):
+async def remove_adapter(adapter):
     """Remove an adapter and clean up its resources."""
-    if adapter.dlna.uuid in adapters:
-        # Shutdown the state thread before removing
-        if hasattr(adapter, 'state') and adapter.state is not None:
-            adapter.state.shutdown()
-        del adapters[adapter.dlna.uuid]
+    async with _adapters_lock:
+        if adapter.dlna.uuid in adapters:
+            # Shutdown the state thread before removing
+            if hasattr(adapter, 'state') and adapter.state is not None:
+                adapter.state.shutdown()
+            del adapters[adapter.dlna.uuid]
 
 
 class PlexLib(object):
@@ -257,7 +258,7 @@ class DlnaState(object):
         self._thread_should_stop = True
         if self.looping_thread is not None:
             if self.looping_thread.is_alive():
-                self.looping_thread.join()
+                self.looping_thread.join(timeout=2.0)
             self.looping_thread = None
 
     def shutdown(self):

@@ -945,7 +945,7 @@ async def _stop_virtual_runtime(uuid_value: str, device: Optional[VirtualDlnaDev
         except Exception as e:
             logger.debug("Expected cleanup error during adapter wakeup: %s", e)
         adapter.queue = None
-        remove_adapter(adapter)
+        await remove_adapter(adapter)
 
     if device is None:
         device = _virtual_devices.get(uuid_value)

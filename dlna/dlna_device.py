@@ -622,7 +622,9 @@ class DlnaDevice(object):
             logger.exception("Unexpected error parsing volume range")
 
     async def remove_self(self):
-        devices.remove(self)
+        async with devices_lock:
+            if self in devices:
+                devices.remove(self)
         from plex.adapters import adapter_by_device, remove_adapter
         from plex.subscribe import sub_man
         self.stop_subscribe()
@@ -633,7 +635,7 @@ class DlnaDevice(object):
         await sub_man.notify_device_disconnected(self)
         await sub_man.notify_server_device(self, force=True)
         adapter.queue = None
-        remove_adapter(adapter)
+        await remove_adapter(adapter)
         settings.mark_device_status(self.uuid, "offline")
 
     def __str__(self):
