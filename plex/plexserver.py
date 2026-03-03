@@ -21,6 +21,7 @@
 
 from fastapi import FastAPI, Request, Header, Query, HTTPException, Form
 from fastapi.responses import Response
+from html import escape as xml_escape
 from pydantic import BaseModel, Field
 import uvicorn
 import logging
@@ -851,6 +852,7 @@ async def skip_to(commandID: int,
                   type_: str = Query("music", alias="type"),
                   target_uuid: str = Header(None, alias="x-plex-target-client-identifier"),
                   client_uuid: str = Header(None, alias="x-plex-client-identifier")):
+    require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
         device = await get_device_by_uuid(target_uuid)
@@ -966,7 +968,7 @@ async def resources(request: Request, target_uuid: str = Header(None, alias="x-p
         raise HTTPException(404, f"no device {target_uuid}")
     logger.debug("resource for %s", device.name)
     res = "<MediaContainer>"
-    res += f'<Player title="{device.name}" protocol="plex" protocolVersion="1" ' \
+    res += f'<Player title="{xml_escape(str(device.name), quote=True)}" protocol="plex" protocolVersion="1" ' \
            f'protocolCapabilities="timeline,playback,playqueues" ' \
            f'machineIdentifier="{device.uuid}" product="{device.model}" ' \
            f'platform="{settings.platform}" ' \
@@ -988,10 +990,10 @@ async def mirror(target_uuid: str = Header(None, alias="x-plex-target-client-ide
 class SuppressNoisyHTTPLogsFilter(logging.Filter):
     """Filter out noisy HTTP access logs for specific endpoints"""
     def filter(self, record: logging.LogRecord) -> bool:
-        # Suppress logs for polling endpoints
-        if "/api/devices" in record.getMessage():
+        msg = record.getMessage()
+        if "/api/devices" in msg:
             return False
-        if "/player/timeline/poll?commandID=X&wait=1" in record.getMessage():
+        if "/player/timeline/poll" in msg:
             return False
         return True
 
