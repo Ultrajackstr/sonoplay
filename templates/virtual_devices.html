@@ -588,7 +588,7 @@
                     html: `
                         <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
                         <p style="margin-top: 1rem;">Enter this code:</p>
-                        <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${data.pin}</div>
+                        <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${escapeHtml(String(data.pin))}</div>
                     `,
                     confirmButtonText: "I've Entered the Code",
                     showCancelButton: true,
@@ -661,7 +661,7 @@
                 html: `
                     <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
                     <p style="margin-top: 1rem;">Enter this new code:</p>
-                    <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${data.pin}</div>
+                    <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.2rem; font-family: 'JetBrains Mono', monospace; margin: 1rem 0;">${escapeHtml(String(data.pin))}</div>
                 `,
                 confirmButtonText: "I've Entered the Code",
                 showCancelButton: true,

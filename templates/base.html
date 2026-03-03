@@ -126,6 +126,14 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js"></script>
     
     <script>
+        // HTML escaping for dynamic server values
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(String(text)));
+            return div.innerHTML;
+        }
+
         // Plex Status Management
         let plexConnected = false;
         
@@ -272,8 +280,8 @@
                         html: `
                             <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
                             <p style="margin-top: 1rem;">Enter this code:</p>
-                            <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${pinData.pin}</div>
-                            <p style="color: #666; font-size: 0.9rem;">Linking: ${selectedDevice.name}</p>
+                            <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${escapeHtml(pinData.pin)}</div>
+                            <p style="color: #666; font-size: 0.9rem;">Linking: ${escapeHtml(selectedDevice.name)}</p>
                         `,
                         confirmButtonText: 'I\'ve Entered the Code',
                         showCancelButton: true,
@@ -554,8 +562,8 @@
                     <div class="onboarding-device" style="display: flex; align-items: center; padding: 0.75rem; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 0.5rem;">
                         <input type="checkbox" id="dev-${idx}" value="${idx}" checked style="margin-right: 0.75rem; width: 18px; height: 18px;">
                         <label for="dev-${idx}" style="flex: 1; cursor: pointer;">
-                            <div style="font-weight: 500;">${device.name}</div>
-                            <div style="font-size: 0.85rem; color: #666;">${device.location || 'DLNA Device'}</div>
+                            <div style="font-weight: 500;">${escapeHtml(device.name)}</div>
+                            <div style="font-size: 0.85rem; color: #666;">${escapeHtml(device.location || 'DLNA Device')}</div>
                         </label>
                         <span style="font-size: 0.75rem; padding: 2px 8px; background: ${device.binded ? '#dcfce7' : '#fef3c7'}; color: ${device.binded ? '#166534' : '#92400e'}; border-radius: 4px;">
                             ${device.binded ? 'Linked' : 'Not Linked'}
@@ -604,7 +612,7 @@
                         <p style="margin-bottom: 1rem; color: #666;">Device ${deviceIndex + 1} of ${this.selectedDevices.length}</p>
                         <div style="text-align: left; margin-bottom: 1rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Device Name:</label>
-                            <input type="text" id="device-name" class="swal2-input" value="${device.name}" style="margin: 0; width: 100%;">
+                            <input type="text" id="device-name" class="swal2-input" value="${escapeHtml(device.name)}" style="margin: 0; width: 100%;">
                         </div>
                         ${!device.binded ? `
                             <div style="text-align: left; padding: 1rem; background: #fef3c7; border-radius: 8px;">
@@ -709,7 +717,7 @@
                             html: `
                                 <p>Visit <a href="https://plex.tv/link" target="_blank" style="color: #e5a00d; font-weight: bold;">plex.tv/link</a></p>
                                 <p style="margin-top: 1rem;">Enter this code:</p>
-                                <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${pinData.pin}</div>
+                                <div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 0.25rem; font-family: monospace; margin: 1rem 0; color: #1a1a1a;">${escapeHtml(pinData.pin)}</div>
                             `,
                             confirmButtonText: 'I\'ve Entered the Code',
                             showCancelButton: true,
@@ -807,7 +815,7 @@
                     <div style="display: flex; align-items: center; padding: 0.75rem; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 0.5rem;">
                         <input type="checkbox" id="grp-dev-${idx}" value="${device.uuid}" checked style="margin-right: 0.75rem; width: 18px; height: 18px;">
                         <label for="grp-dev-${idx}" style="flex: 1; cursor: pointer;">
-                            <div style="font-weight: 500;">${device.name}</div>
+                            <div style="font-weight: 500;">${escapeHtml(device.name)}</div>
                         </label>
                     </div>
                 `).join('');
