@@ -512,6 +512,14 @@ class PlexDlnaAdapter(object):
         self._seen_playing_since_operation = False
         self._operation_start_time: Optional[float] = None
 
+    async def _with_no_notice(self, coro):
+        """Wrap a coroutine so no_notice is True while it runs on the main loop."""
+        self.no_notice = True
+        try:
+            await coro
+        finally:
+            self.no_notice = False
+
     def _start_transport_operation(self, target_uri: str) -> int:
         self._operation_sequence += 1
         self._active_operation_id = self._operation_sequence
@@ -696,19 +704,15 @@ class PlexDlnaAdapter(object):
                     or (
                     changed.elapsed and changed.elapsed > changed.old.elapsed and
                     self.current_track_info.duration // 1000 * 1000 <= changed.elapsed <= self.current_track_info.duration):
-                self.no_notice = True
                 logger.info("auto next stopped %s, elapsed: %s -> %s, %s",
                             self.state.state, changed.old.elapsed, changed.elapsed, self.current_track_info.duration)
                 self.state.update(state="TRANSITIONING", uri=None)
-                asyncio.run_coroutine_threadsafe(auto_next(), self.loop)
-                self.no_notice = False
+                asyncio.run_coroutine_threadsafe(self._with_no_notice(auto_next()), self.loop)
                 return True
         elif not changed.uri and changed.old.state == "PLAYING" and changed.state == "STOPPED" and self.state.current_track_duration - self.state.elapsed <= 1:
-            self.no_notice = True
             logger.info("auto next transitioning %s %s", changed.old.state, changed.state)
             self.state.update(state="TRANSITIONING", uri=None)
-            asyncio.run_coroutine_threadsafe(auto_next(), self.loop)
-            self.no_notice = False
+            asyncio.run_coroutine_threadsafe(self._with_no_notice(auto_next()), self.loop)
             return True
         return False
 
