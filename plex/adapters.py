@@ -1153,7 +1153,7 @@ class PlexDlnaAdapter(object):
         return d
 
     async def get_state(self):
-        if self.state == "STOPPED" or self.state is None or self.queue is None:
+        if self.state is None or self.state.state in ("STOPPED", "NO_MEDIA_PRESENT", None) or self.queue is None:
             return {}
         lib_info = self.plex_lib.get_info()
         shuffle = self.shuffle
