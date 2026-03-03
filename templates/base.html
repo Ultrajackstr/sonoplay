@@ -56,20 +56,20 @@
                     </button>
                     
                     <!-- Plex Status -->
-                    <div class="plex-status disconnected" id="plexStatus" onclick="handlePlexClick()">
+                    <button type="button" class="plex-status disconnected" id="plexStatus" onclick="handlePlexClick()">
                         <span class="plex-dot"></span>
                         <span class="plex-text">Connect Plex</span>
-                    </div>
+                    </button>
                 </div>
             </div>
         </nav>
         
         <!-- Audio Settings Modal -->
-        <div id="settingsModal" class="settings-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div id="settingsModal" class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
             <div class="settings-modal-content" style="background: var(--bg-primary); border-radius: 12px; padding: 2rem; max-width: 450px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 600;">Audio Settings</h2>
-                    <button onclick="closeSettingsModal()" style="background: none; border: none; cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); line-height: 1;">&times;</button>
+                    <h2 id="settingsModalTitle" style="margin: 0; font-size: 1.25rem; font-weight: 600;">Audio Settings</h2>
+                    <button onclick="closeSettingsModal()" aria-label="Close settings" style="background: none; border: none; cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); line-height: 1;">&times;</button>
                 </div>
                 
                 <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">
@@ -78,7 +78,7 @@
                 
                 <!-- Bitrate Slider -->
                 <div style="margin-bottom: 1.5rem;">
-                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
+                    <label for="bitrateSlider" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
                         <span>Bitrate Limit</span>
                         <span id="bitrateValue" style="color: var(--text-secondary);">1500 kbps</span>
                     </label>
@@ -93,7 +93,7 @@
                 
                 <!-- Sample Rate Slider -->
                 <div style="margin-bottom: 2rem;">
-                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
+                    <label for="sampleRateSlider" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500;">
                         <span>Sample Rate Limit</span>
                         <span id="sampleRateValue" style="color: var(--text-secondary);">48 kHz</span>
                     </label>

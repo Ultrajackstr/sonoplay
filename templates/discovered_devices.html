@@ -46,10 +46,12 @@
     </div>
     <div class="search-box">
         <i class="fas fa-search search-icon"></i>
+        <label for="deviceSearchInput" class="sr-only">Search devices</label>
         <input type="text" 
                id="deviceSearchInput" 
                class="search-input" 
-               placeholder="Search devices...">
+               placeholder="Search devices..."
+               aria-label="Search devices">
     </div>
 </header>
 
@@ -334,13 +336,13 @@
                         </div>
                     </div>
                     <div class="playback-controls">
-                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')">
+                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')" aria-label="Previous track">
                             <i class="fas fa-step-backward"></i>
                         </button>
-                        <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')">
+                        <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause">
                             <i class="fas fa-pause"></i>
                         </button>
-                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')">
+                        <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')" aria-label="Next track">
                             <i class="fas fa-step-forward"></i>
                         </button>
                     </div>
@@ -384,7 +386,7 @@
                     ${nowPlayingHtml}
                     <div class="device-controls">
                         ${actionButton}
-                        <button class="icon-btn" onclick="event.stopPropagation(); editDeviceName('${safeUuid}', '${safeName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Edit">
+                        <button class="icon-btn" onclick="event.stopPropagation(); editDeviceName('${safeUuid}', '${safeName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Edit" aria-label="Edit device name">
                             <i class="fas fa-pen"></i>
                         </button>
                     </div>

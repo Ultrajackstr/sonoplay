@@ -288,10 +288,12 @@
     <div class="page-header-actions">
         <div class="search-box">
             <i class="fas fa-search search-icon"></i>
+            <label for="groupSearchInput" class="sr-only">Search groups</label>
             <input type="text" 
                    id="groupSearchInput" 
                    class="search-input" 
-                   placeholder="Search groups...">
+                   placeholder="Search groups..."
+                   aria-label="Search groups">
         </div>
         <button class="control-btn primary create-btn" onclick="openCreateModal()">
             <i class="fas fa-plus"></i>
@@ -451,13 +453,13 @@
                     </div>
                 </div>
                 <div class="playback-controls">
-                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')">
+                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')" aria-label="Previous track">
                         <i class="fas fa-step-backward"></i>
                     </button>
-                    <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')">
+                    <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause">
                         <i class="fas fa-pause"></i>
                     </button>
-                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')">
+                    <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')" aria-label="Next track">
                         <i class="fas fa-step-forward"></i>
                     </button>
                 </div>
@@ -503,10 +505,10 @@
                 ${nowPlayingHtml}
                 <div class="card-actions">
                     ${actionButton}
-                    <button class="icon-btn" onclick="event.stopPropagation(); openEditModal('${safeUuid}')" title="Edit">
+                    <button class="icon-btn" onclick="event.stopPropagation(); openEditModal('${safeUuid}')" title="Edit" aria-label="Edit group">
                         <i class="fas fa-pen"></i>
                     </button>
-                    <button class="icon-btn danger" onclick="event.stopPropagation(); deleteGroup('${safeUuid}')" title="Delete">
+                    <button class="icon-btn danger" onclick="event.stopPropagation(); deleteGroup('${safeUuid}')" title="Delete" aria-label="Delete group">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
