@@ -107,7 +107,8 @@ class PlayQueue(object):
 
     async def set_selected_offset(self, offset):
         total = await self.total_count()
-        assert 0 <= offset < total
+        if not (0 <= offset < total):
+            raise ValueError(f"Queue offset {offset} out of range [0, {total})")
         await self.get_info()
 
         while True:
@@ -133,7 +134,8 @@ class PlayQueue(object):
         if self.info is None:
             await self.get_info()
         total = await self.total_count()
-        assert 0 <= offset < total
+        if not (0 <= offset < total):
+            raise ValueError(f"Queue offset {offset} out of range [0, {total})")
 
         while True:
             last_offset = self.last_offset
