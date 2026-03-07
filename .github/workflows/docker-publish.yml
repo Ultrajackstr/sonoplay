@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-      - 'stable'
 
 env:
   REGISTRY: ghcr.io
@@ -36,8 +35,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/stable') }}
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
