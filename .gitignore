@@ -58,7 +58,6 @@ temp/
 # ── GitHub (track workflows and instructions only) ──
 .github/*
 !.github/workflows/
-!.github/instructions/
 
 # ── Git worktrees ──
 .worktrees/
