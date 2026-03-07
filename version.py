@@ -1,6 +1,6 @@
 """Version and startup banner for SonoPlay."""
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 LICENSE = "GPL-3.0"
 PRODUCT = "SonoPlay"
 
