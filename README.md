@@ -42,7 +42,7 @@ docker run -d \
   --network host \
   --restart unless-stopped \
   -v /path/to/config:/config \
-  ghcr.io/aquantumofdonuts/sonoplay:stable
+  ghcr.io/aquantumofdonuts/sonoplay:latest
 ```
 
 Or with Docker Compose:
