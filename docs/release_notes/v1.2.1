@@ -1,0 +1,32 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The latest version is always available by pulling the `latest` tag.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [v1.2.1] - 2026-03-07
+
+Patch release with build and packaging fixes identified during v1.2.0 code review.
+
+### Fixed
+
+- References to retired `stable` Docker tag updated to `latest` across all documentation
+- Docker image now uses non-editable `pip install` for a cleaner production build
+- Trailing newline added to `docker-compose.yaml` for POSIX compliance
+
+### Changed
+
+- CI workflow gates the `latest` Docker tag to non-prerelease semver versions only
+
+---
+
+## Previous Releases
+
+- [v1.2.0](v1.2.0) — Security hardening, accessibility, stability, codebase cleanup
+- [v1.1.2](v1.1.2) — Device quirks system, Sony/Denon/Marantz/Bose workarounds
+- [v1.1.1](v1.1.2) — HTTP 5xx retry logic, XML response sanitization
+- [v1.1.0](v1.1.2) — Virtual device groups, modern web UI, device statistics
+- [v1.0.0](v1.1.2) — Original baseline
