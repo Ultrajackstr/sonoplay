@@ -7,6 +7,33 @@ The latest version is always available by pulling the [stable] tag.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2026-03-07
+
+This release focuses on security hardening, accessibility improvements, stability fixes, and a significant codebase cleanup.
+
+### Security
+
+- **14 CVEs resolved** by bumping aiohttp, starlette, jinja2, brotli, and python-multipart to patched versions
+- **XSS prevention** — server-returned values in notification dialogs are now properly escaped
+- **XML injection protection** — device names are escaped in generated XML; UUID inputs are validated
+- Dependency versions pinned (pydantic, pydantic-settings) for reproducible, auditable builds
+
+### Improved
+
+- **Accessibility** — keyboard focus indicators, reduced-motion support, ARIA attributes, semantic buttons, and form labels throughout the web UI
+- **Device disconnect handling** — unreachable devices now return a clear 503 status instead of crashing; reconnection is seamless when devices come back online
+- **Shutdown reliability** — all background tasks (Plex TV, GDM discovery) are now properly cancelled and cleaned up on exit, eliminating orphaned connections
+- **Thread safety** — race conditions in adapter removal, device list updates, and cross-thread notification delivery have been resolved
+
+### Under the Hood
+
+- Removed 2,300+ lines of dead frontend code (legacy theme system)
+- Extracted shared JavaScript utilities into a single reusable module
+- Deduplicated Plex HTTP header construction across the codebase
+- Rebrand from SonoPlex → SonoPlay completed across all files
+
+---
+
 ## [v1.1.2] - 2026-01-17
 
 This release improves DLNA device compatibility with a device quirks system for manufacturer-specific workarounds.
