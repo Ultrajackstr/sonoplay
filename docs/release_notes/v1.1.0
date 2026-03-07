@@ -1,0 +1,112 @@
+# Release Notes: v1.1.0
+
+**Release Date:** March 2026
+
+## Overview
+
+SonoPlay v1.1.0 is the first official release under the SonoPlay name. It covers everything built since the original plexdlnaplayer fork: virtual device groups for multi-room audio, a modern web UI, broad DLNA device compatibility, security hardening, accessibility, and stability improvements.
+
+---
+
+## What's New
+
+### Virtual Device Groups
+- Combine multiple DLNA speakers into synchronized multi-room groups
+- Capability-based member validation ensures only compatible devices can be grouped
+- Persistent storage maintains groups across restarts
+- Dedicated web UI page and RESTful API for group management
+
+### Modern Web UI
+- Complete redesign from basic HTML table to responsive dual-page application
+- Real-time device status, playback info, and statistics
+- Mobile-friendly layouts with touch controls
+- Search and filter across all device views
+
+### DLNA Device Compatibility
+
+#### Device Quirks System
+- Per-device workaround registry with case-insensitive regex matching
+- Built-in quirks for Sony, Denon/HEOS, Marantz, and Bose SoundTouch
+- User overrides via `device_quirks` in data.json
+- Sony-specific fixes: premature STOPPED filtering, wait-for-can-play polling
+
+#### HTTP 5xx Retry Logic
+- Oppo and similar devices that return HTTP 500 during normal operation now retry up to 3 times instead of failing immediately
+
+#### XML Response Sanitization
+- Pre-processes all XML responses to handle malformed output from various manufacturers
+
+| Fix | Affected Devices |
+|-----|------------------|
+| Malformed namespace prefix (`<&` → `<s:`) | Oppo |
+| Illegal XML control characters | Sonos |
+| Missing `xmlns:dlna` declaration | Various |
+| Non-standard namespace | Belkin WeMo |
+| Trailing garbage after envelope | Various |
+| Leading HTTP headers before XML | Windows UPnP |
+
+### Security
+- 14 CVEs resolved by bumping aiohttp, starlette, jinja2, brotli, and python-multipart
+- XSS prevention — server-returned values in notification dialogs are properly escaped
+- XML injection protection — device names escaped in generated XML; UUID inputs validated
+- Dependency versions pinned for reproducible builds
+
+### Accessibility
+- Keyboard focus indicators (`focus-visible`)
+- Reduced-motion support (`prefers-reduced-motion`)
+- ARIA attributes on all interactive elements
+- Semantic buttons and form labels throughout the UI
+
+### Stability
+- Proper shutdown cleanup — all background tasks (Plex TV, GDM discovery) cancelled on exit
+- Thread-safe data access with locking on settings read/write
+- Async-safe adapter and device removal
+- Cross-thread `no_notice` race condition resolved
+- Graceful device disconnect handling (503 status for unreachable devices)
+- Subscriber eviction after 3 consecutive errors instead of 1
+
+### Infrastructure
+- Multi-stage Dockerfile with non-root container user
+- Container healthcheck endpoint
+- Deny-by-default `.dockerignore`
+- GitHub Actions CI/CD — automatic image build and push to ghcr.io on tag
+- Docker Compose support with named volumes
+
+---
+
+## Under the Hood
+
+- Rebrand from SonoPlex → SonoPlay across all files
+- Removed 2,300+ lines of dead frontend code (legacy theme system)
+- Extracted shared JavaScript utilities into a single reusable module
+- Deduplicated Plex HTTP header construction (3 copies → 1 shared builder)
+- Subscription expiry tracking with proactive renewal
+- Device statistics tracking (play count, total duration, session duration)
+
+---
+
+## Dependencies
+
+| Package | v1.0.0 | v1.1.0 |
+|---------|--------|--------|
+| aiohttp | 3.7.4 | 3.13.3 |
+| fastapi | 0.68.0 | 0.135.1 |
+| pydantic | 1.8.2 | 2.12.5 |
+| uvicorn | 0.15.0 | 0.34.0 |
+| uvloop | 0.16.0 | 0.21.0 |
+| Jinja2 | 3.0.1 | 3.1.6 |
+| starlette | 0.14.2 | 0.50.0 |
+| brotli | 1.1.0 | 1.2.0 |
+| python-multipart | 0.0.9 | 0.0.22 |
+
+---
+
+## Original Baseline (v1.0.0)
+
+Original implementation by [@songchenwen](https://github.com/songchenwen) — [plexdlnaplayer](https://github.com/songchenwen/plexdlnaplayer).
+
+- UPNP auto discovery to find DLNA devices in LAN
+- Plex GDM to notify Plex clients about DLNA devices
+- Connect DLNA devices to plex.tv for Plexamp support
+- Basic web UI with HTML table for device management
+- Device linking via plex.tv PIN authentication
