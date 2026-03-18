@@ -508,6 +508,8 @@ class PlexDlnaAdapter(object):
         self._last_operation_finish_time: Optional[float] = None
         self._post_operation_protection_window = 2.0  # seconds
         self._last_finished_target_uri: Optional[str] = None
+        self._in_false_stop_recovery = False
+        self._auto_next_in_flight = False
         # Premature STOPPED filtering (LMS-uPnP #63, go2tv #43)
         self._seen_playing_since_operation = False
         self._operation_start_time: Optional[float] = None
@@ -519,6 +521,7 @@ class PlexDlnaAdapter(object):
             await coro
         finally:
             self.no_notice = False
+            self._auto_next_in_flight = False
 
     def _start_transport_operation(self, target_uri: str) -> int:
         self._operation_sequence += 1
@@ -609,6 +612,10 @@ class PlexDlnaAdapter(object):
         When detected, it triggers a retry of the current track.
         Returns True if false stop was detected and handled, False otherwise.
         """
+        # Don't re-trigger while a recovery is already in progress
+        if self._in_false_stop_recovery:
+            return False
+        
         # Only check for PLAYING -> STOPPED transitions
         if 'state' not in changed_state:
             return False
@@ -640,8 +647,9 @@ class PlexDlnaAdapter(object):
         # Clear the finish time to prevent infinite retry loops
         self._last_operation_finish_time = None
         
-        # Suppress auto-next during recovery
+        # Suppress auto-next during recovery and guard against re-trigger
         self._suppress_auto_next = True
+        self._in_false_stop_recovery = True
         
         # Schedule recovery: replay the current track
         async def recover_playback():
@@ -653,6 +661,7 @@ class PlexDlnaAdapter(object):
                     logger.info("%s recovery: no queue, cannot replay", self.dlna.name)
             finally:
                 self._suppress_auto_next = False
+                self._in_false_stop_recovery = False
         
         asyncio.run_coroutine_threadsafe(recover_playback(), self.loop)
         return True
@@ -706,11 +715,19 @@ class PlexDlnaAdapter(object):
                     self.current_track_info.duration // 1000 * 1000 <= changed.elapsed <= self.current_track_info.duration):
                 logger.info("auto next stopped %s, elapsed: %s -> %s, %s",
                             self.state.state, changed.old.elapsed, changed.elapsed, self.current_track_info.duration)
+                # Set no_notice and auto_next flag IMMEDIATELY (before scheduling)
+                # to prevent the subscriber from reporting STOPPED to Plex,
+                # which would cause Plex to send a stale stop command that
+                # kills the auto-next playback.
+                self.no_notice = True
+                self._auto_next_in_flight = True
                 self.state.update(state="TRANSITIONING", uri=None)
                 asyncio.run_coroutine_threadsafe(self._with_no_notice(auto_next()), self.loop)
                 return True
         elif not changed.uri and changed.old.state == "PLAYING" and changed.state == "STOPPED" and self.state.current_track_duration - self.state.elapsed <= 1:
             logger.info("auto next transitioning %s %s", changed.old.state, changed.state)
+            self.no_notice = True
+            self._auto_next_in_flight = True
             self.state.update(state="TRANSITIONING", uri=None)
             asyncio.run_coroutine_threadsafe(self._with_no_notice(auto_next()), self.loop)
             return True
@@ -748,19 +765,25 @@ class PlexDlnaAdapter(object):
                     return
                 elif changed_state.current_uri and changed_state.current_uri != self._active_target_uri:
                     if changed_state.old.get('current_uri') == self._active_target_uri:
-                        # Sonos reverted from our target URI - device likely rejected it
-                        # Check if current track is playable before trying to restore
-                        # This is a fallback in case transcoding fails or other issues occur
-                        if hasattr(self, 'current_track_info') and self.current_track_info:
-                            if not self.queue.is_track_playable(self.current_track_info):
-                                logger.warning("%s device rejected track even after transcode attempt, skipping to next", self.dlna.name)
-                                # Cancel the active operation and skip to next track
-                                self._active_operation_id = None
-                                self._active_operation_event = None
-                                self._transport_state_override = None
-                                # Schedule next() to run in the event loop
-                                asyncio.run_coroutine_threadsafe(self.next(), self.loop)
-                                return
+                        if self._active_operation_uri_confirmed:
+                            # Device previously confirmed our target URI, then reverted —
+                            # genuine rejection.  Check if the original track was already
+                            # un-playable (high-bitrate) to decide whether to skip.
+                            if hasattr(self, 'current_track_info') and self.current_track_info:
+                                if not self.queue.is_track_playable(self.current_track_info):
+                                    logger.warning("%s device rejected track even after transcode attempt, skipping to next", self.dlna.name)
+                                    # Cancel the active operation and skip to next track
+                                    self._active_operation_id = None
+                                    self._active_operation_event = None
+                                    self._transport_state_override = None
+                                    # Schedule next() to run in the event loop
+                                    asyncio.run_coroutine_threadsafe(self.next(), self.loop)
+                                    return
+                        else:
+                            # URI was never confirmed by the device — this "reversion"
+                            # is a phantom from our internal state update racing with
+                            # the polling cycle.  Restore the target and keep waiting.
+                            logger.debug("%s ignoring phantom URI reversion (device never confirmed target)", self.dlna.name)
                         logger.debug("%s reverting URI %s -> restoring target %s", self.dlna.name, changed_state.current_uri, self._active_target_uri)
                         self.state.update(uri=self._active_target_uri)
                         return
@@ -981,6 +1004,14 @@ class PlexDlnaAdapter(object):
         self.state.check_all_next_loop = True
 
     async def stop(self, *, force: bool = False):
+        # Guard against stale Plex stop commands during auto-next transition.
+        # When a track ends naturally and auto-next fires, there's a race:
+        # the subscriber may report STOPPED to Plex before the state updates
+        # to TRANSITIONING, causing Plex to send a redundant stop that kills
+        # the auto-next playback.
+        if not force and self._auto_next_in_flight:
+            logger.info("%s ignoring stale stop command during auto-next transition", self.dlna.name)
+            return
         controller = self.virtual_controller()
         if controller is not None and not force:
             logger.info("%s stop request rerouted to virtual device %s", self.dlna.name, controller.name)
@@ -991,6 +1022,9 @@ class PlexDlnaAdapter(object):
             if active_id:
                 self._finish_transport_operation(active_id)
             self._suppress_auto_next = True
+            # Intentional stop: clear post-operation timestamp so false-STOP
+            # detection does not misinterpret the resulting STOPPED event
+            self._last_operation_finish_time = None
         self.state.update(state="STOPPED", uri=None)
         self.current_track_info = None
         if force:
