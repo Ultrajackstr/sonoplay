@@ -689,6 +689,8 @@ class PlexDlnaAdapter(object):
             return False
         if self._suppress_auto_next:
             return False
+        if self._auto_next_in_flight:
+            return False
         if self._active_operation_id:
             return False
         if self.queue is None:
@@ -1072,10 +1074,12 @@ class PlexDlnaAdapter(object):
 
         if current_offset < 0:
             logger.debug("%s next guard stop: offset<0 current=%s start=%s", self.dlna.name, current_offset, start_offset)
+            self._auto_next_in_flight = False
             await self.stop()
             return
         if not math.isinf(total_count) and current_offset >= total_count:
             logger.debug("%s next guard stop: offset>=total current=%s total=%s", self.dlna.name, current_offset, total_count)
+            self._auto_next_in_flight = False
             await self.stop()
             return
         self.state.update(state="TRANSITIONING")
