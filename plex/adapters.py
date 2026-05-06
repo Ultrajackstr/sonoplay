@@ -196,7 +196,22 @@ class DlnaState(object):
     def background_loop(self):
         self.running_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.running_loop)
-        self.running_loop.run_until_complete(self._check_loop())
+        try:
+            self.running_loop.run_until_complete(self._check_loop())
+        finally:
+            # Cancel any tasks still pending on this loop before closing it.
+            # Without this, the epoll FD created by new_event_loop() leaks on
+            # every stop/restart cycle, exhausting the process's FD limit.
+            try:
+                pending = asyncio.all_tasks(self.running_loop)
+                if pending:
+                    for task in pending:
+                        task.cancel()
+                    self.running_loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+            finally:
+                self.running_loop.close()
 
     def begin_change_session(self):
         self._changed_state = DotMap()
