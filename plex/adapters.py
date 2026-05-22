@@ -194,24 +194,27 @@ class DlnaState(object):
         self.looping_thread = loop_thread
 
     def background_loop(self):
-        self.running_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.running_loop)
+        # Keep a LOCAL reference to the loop so the finally block can always
+        # close it even if _check_loop sets self.running_loop = None before
+        # returning (which was causing close() to be called on None, leaking
+        # all of the uvloop libuv FDs: epoll, eventfd, and pipe pairs).
+        loop = asyncio.new_event_loop()
+        self.running_loop = loop
+        asyncio.set_event_loop(loop)
         try:
-            self.running_loop.run_until_complete(self._check_loop())
+            loop.run_until_complete(self._check_loop())
         finally:
-            # Cancel any tasks still pending on this loop before closing it.
-            # Without this, the epoll FD created by new_event_loop() leaks on
-            # every stop/restart cycle, exhausting the process's FD limit.
             try:
-                pending = asyncio.all_tasks(self.running_loop)
+                pending = asyncio.all_tasks(loop)
                 if pending:
                     for task in pending:
                         task.cancel()
-                    self.running_loop.run_until_complete(
+                    loop.run_until_complete(
                         asyncio.gather(*pending, return_exceptions=True)
                     )
             finally:
-                self.running_loop.close()
+                self.running_loop = None
+                loop.close()
 
     def begin_change_session(self):
         self._changed_state = DotMap()
@@ -416,7 +419,6 @@ class DlnaState(object):
                     check_count = 0
                 await self.wait_for_next_loop()
         logger.debug("%s state loop stopped", self.dlna.name)
-        self.running_loop = None
 
     def update(self, state: str = "", uri: str = "", position: str = ""):
         elapsed = ""
