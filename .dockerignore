@@ -7,13 +7,11 @@
 !pyproject.toml
 !requirements.txt
 
-# Build-stage: package install
-!src/
-
 # Runtime: application code
 !main.py
 !logging_config.py
 !version.py
+!transport_readiness.py
 !plex/
 !dlna/
 !settings/

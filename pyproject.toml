@@ -44,6 +44,14 @@ Homepage = "https://github.com/aquantumofdonuts/sonoplay"
 Repository = "https://github.com/aquantumofdonuts/sonoplay"
 Issues = "https://github.com/aquantumofdonuts/sonoplay/issues"
 
+[tool.setuptools]
+# SonoPlay runs from its source tree (the Docker image copies the top-level
+# plex/ dlna/ settings/ utils/ packages and main.py); it is not installed as a
+# package. Declare no modules so `pip install .` / `pip install -e .[dev]`
+# only resolves dependencies instead of tripping over the flat layout's
+# multiple top-level directories.
+py-modules = []
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

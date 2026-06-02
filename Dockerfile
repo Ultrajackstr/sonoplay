@@ -11,12 +11,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY pyproject.toml requirements.txt ./
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source and install package
-COPY src/ src/
-RUN pip install --no-cache-dir .
 
 # --- Final stage: slim runtime image ---
 FROM python:3.12-slim
@@ -33,12 +29,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY templates/ templates/
 COPY static/ static/
-COPY main.py logging_config.py version.py ./
+COPY main.py logging_config.py version.py transport_readiness.py ./
 COPY plex/ plex/
 COPY dlna/ dlna/
 COPY settings/ settings/
 COPY utils/ utils/
-COPY src/ src/
 
 # Set ownership
 RUN chown -R sonoplay:sonoplay /app
