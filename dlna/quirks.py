@@ -4,8 +4,6 @@
 Sources:
 - async_upnp_client: HEOS subscription timeout
 - LMS-uPnP #63: Sony/Denon premature STOPPED
-- go2tv #43: Sony HT-A9 workarounds
-- Original repo #10: Timeout for WAN playback
 """
 
 import logging
@@ -17,13 +15,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Default quirk values
+# Default quirk values. Only quirks the live code actually consults are kept:
+# ignore_premature_stopped (plex/adapters.py) and subscription_timeout
+# (dlna/dlna_device.py). wait_for_can_play / detect_end_by_elapsed /
+# control_timeout were defined but never read, so they were removed.
 DEFAULT_QUIRKS: dict[str, Any] = {
     "ignore_premature_stopped": True,  # Most devices benefit from this
-    "wait_for_can_play": False,        # Only enable for slow devices
-    "subscription_timeout": None,       # None = use settings default
-    "detect_end_by_elapsed": False,     # For devices that don't report track end
-    "control_timeout": None,            # None = use settings default
+    "subscription_timeout": None,      # None = use settings default
 }
 
 # Known device quirks by manufacturer/model pattern
@@ -34,7 +32,6 @@ KNOWN_DEVICE_QUIRKS: dict[tuple[str, str], dict[str, Any]] = {
     # Source: LMS-uPnP #63, go2tv #43
     (r"sony", r".*"): {
         "ignore_premature_stopped": True,
-        "wait_for_can_play": True,
     },
     # HEOS/Denon: 9-minute subscription timeout limit
     # Source: async_upnp_client CHANGES.rst
@@ -46,11 +43,6 @@ KNOWN_DEVICE_QUIRKS: dict[tuple[str, str], dict[str, Any]] = {
     (r"marantz", r".*"): {
         "subscription_timeout": 540,
         "ignore_premature_stopped": True,
-    },
-    # Bose SoundTouch: Never reports track end
-    # Source: LMS-uPnP userguide
-    (r"bose", r"soundtouch"): {
-        "detect_end_by_elapsed": True,
     },
 }
 
@@ -98,12 +90,7 @@ def _validate_quirks(quirks: dict[str, Any]) -> dict[str, Any]:
                 value = min(max(int(value), 60), 3600)  # Clamp 60-3600
             except (TypeError, ValueError):
                 continue
-        if key == "control_timeout" and value is not None:
-            try:
-                value = min(max(float(value), 1.0), 60.0)  # Clamp 1-60
-            except (TypeError, ValueError):
-                continue
-        if key in ("ignore_premature_stopped", "wait_for_can_play", "detect_end_by_elapsed"):
+        if key == "ignore_premature_stopped":
             value = bool(value)
         validated[key] = value
     return validated
@@ -143,24 +130,9 @@ def get_device_quirks(device: Any) -> dict[str, Any]:
 
 
 def clear_quirks_cache(uuid: str | None = None) -> None:
-    """Clear cached quirks (call after user changes settings)."""
+    """Drop cached quirks for a device (called on device teardown so the
+    per-UUID cache doesn't grow unbounded), or all of them when uuid is None."""
     if uuid:
         _quirks_cache.pop(uuid, None)
     else:
         _quirks_cache.clear()
-
-
-def set_device_quirk(uuid: str, quirk: str, value: Any) -> None:
-    """Set a user quirk override for a device."""
-    from settings import settings
-    if quirk not in DEFAULT_QUIRKS:
-        raise ValueError(f"Unknown quirk: {quirk}")
-    
-    data = settings.load_data()
-    device_data = data.get(uuid, {})
-    quirks = device_data.get("quirks", {})
-    quirks[quirk] = value
-    device_data["quirks"] = quirks
-    data[uuid] = device_data
-    settings.save_data(data)
-    clear_quirks_cache(uuid)

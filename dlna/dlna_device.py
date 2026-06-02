@@ -661,6 +661,7 @@ class DlnaDevice(object):
                 devices.remove(self)
         from plex.adapters import adapter_by_device, remove_adapter
         from plex.subscribe import sub_man
+        from dlna.quirks import clear_quirks_cache
         self.stop_subscribe()
         adapter = await adapter_by_device(self)
         adapter.state.state = "STOPPED"
@@ -670,6 +671,7 @@ class DlnaDevice(object):
         await sub_man.notify_server_device(self, force=True)
         adapter.queue = None
         await remove_adapter(adapter)
+        clear_quirks_cache(self.uuid)
         settings.mark_device_status(self.uuid, "offline")
 
     def __str__(self):
