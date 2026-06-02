@@ -41,6 +41,23 @@ def _make_store():
     return JSONDataStore(mock_settings)
 
 
+class _MemSettings:
+    """In-memory load_data/save_data so the datastore round-trips for real."""
+
+    def __init__(self):
+        self._data = {}
+
+    def load_data(self):
+        return self._data
+
+    def save_data(self, data):
+        self._data = data
+
+
+def _mem_store():
+    return JSONDataStore(_MemSettings())
+
+
 def test_set_audio_settings_sample_rate_only():
     """set_audio_settings must not crash when only sample_rate_hz is provided."""
     store = _make_store()
@@ -52,3 +69,31 @@ def test_set_audio_settings_bitrate_only():
     """set_audio_settings must work when only bitrate_kbps is provided."""
     store = _make_store()
     store.set_audio_settings(bitrate_kbps=320)
+
+
+def test_default_audio_settings_is_no_transcode():
+    """Fresh store must default to 'no limit' (None/None) so it matches the
+    runtime Settings default (audio_transcode_* = None) -- otherwise loading the
+    datastore at startup would silently re-enable transcoding."""
+    store = _mem_store()
+    audio = store.get_audio_settings()
+    assert audio["bitrate_kbps"] is None
+    assert audio["sample_rate_hz"] is None
+
+
+def test_audio_settings_roundtrip():
+    """A saved limit must survive a load (the persistence the startup path relies on)."""
+    store = _mem_store()
+    store.set_audio_settings(bitrate_kbps=320, sample_rate_hz=96000)
+    audio = store.get_audio_settings()
+    assert audio["bitrate_kbps"] == 320
+    assert audio["sample_rate_hz"] == 96000
+
+
+def test_audio_settings_zero_means_no_limit():
+    """0 (the UI's 'no limit' choice) persists as None, not 0."""
+    store = _mem_store()
+    store.set_audio_settings(bitrate_kbps=0, sample_rate_hz=0)
+    audio = store.get_audio_settings()
+    assert audio["bitrate_kbps"] is None
+    assert audio["sample_rate_hz"] is None

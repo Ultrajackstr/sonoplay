@@ -96,10 +96,15 @@ class DataStore(ABC):
         pass
 
 
-# Default audio settings - safe values for most DLNA speakers
+# Default audio settings. None = "no limit" (direct play, no transcode), which
+# matches the runtime Settings defaults (audio_transcode_* = None). Keeping these
+# in sync matters: the datastore is loaded into the runtime settings at startup,
+# so a non-None default here would silently force transcoding on a fresh install
+# and make the UI (which reads these) disagree with the engine. Set a limit only
+# for devices that need it (some Sonos models), via the web UI.
 DEFAULT_AUDIO_SETTINGS = {
-    "bitrate_kbps": 1500,      # 1500 kbps covers CD quality (1411)
-    "sample_rate_hz": 48000,   # 48kHz max for Sonos/most DLNA
+    "bitrate_kbps": None,
+    "sample_rate_hz": None,
 }
 
 DEFAULT_ONBOARDING_STATE = {

@@ -237,6 +237,24 @@ class Settings(BaseSettings):
     def mark_device_status(self, uuid, status):
         self.update_device_stats(uuid, status=status, last_seen=datetime.now(timezone.utc))
 
+    def apply_audio_settings(self, bitrate_kbps, sample_rate_hz):
+        """Set the runtime transcode thresholds (a falsy value means 'no limit').
+
+        BaseSettings instances are normally immutable post-init, so we set the
+        attributes via object.__setattr__ (same approach the web UI handler uses).
+        """
+        object.__setattr__(self, "audio_transcode_threshold_kbps",
+                           int(bitrate_kbps) if bitrate_kbps else None)
+        object.__setattr__(self, "audio_transcode_max_sample_rate_hz",
+                           int(sample_rate_hz) if sample_rate_hz else None)
+
+    def load_persisted_audio_settings(self):
+        """Load audio transcode settings from the datastore into the runtime
+        attributes. Call once at startup so a limit set in the web UI survives a
+        restart instead of silently reverting to the class defaults."""
+        stored = self.datastore.get_audio_settings()
+        self.apply_audio_settings(stored.get("bitrate_kbps"), stored.get("sample_rate_hz"))
+
 
 settings = Settings()
 

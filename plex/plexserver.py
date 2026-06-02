@@ -216,6 +216,9 @@ async def on_startup():
         connect=settings.http_timeout_connect
     )
     g.http = aiohttp.ClientSession(timeout=timeout)
+    # Restore the user's saved audio-transcode limits; without this they revert
+    # to the class defaults on every restart.
+    settings.load_persisted_audio_settings()
     await dlna_discover.discover()
     asyncio.create_task(sub_man.start())
     await sub_man.start_cleanup_task()
@@ -492,15 +495,13 @@ async def api_update_audio_settings(payload: AudioSettingsUpdate):
         bitrate_kbps=payload.bitrate_kbps,
         sample_rate_hz=payload.sample_rate_hz
     )
-    
-    # Update the runtime settings object so changes take effect immediately
+
+    # Apply to the runtime settings so changes take effect immediately (same
+    # path used at startup, keeping write and restore consistent).
+    settings.load_persisted_audio_settings()
     stored = settings.datastore.get_audio_settings()
-    object.__setattr__(settings, 'audio_transcode_threshold_kbps', 
-                       stored.get("bitrate_kbps") if stored.get("bitrate_kbps") else None)
-    object.__setattr__(settings, 'audio_transcode_max_sample_rate_hz', 
-                       stored.get("sample_rate_hz") if stored.get("sample_rate_hz") else None)
-    
-    logger.info(f"Audio settings updated: bitrate={stored.get('bitrate_kbps')} kbps, sample_rate={stored.get('sample_rate_hz')} Hz")
+    logger.info("Audio settings updated: bitrate=%s kbps, sample_rate=%s Hz",
+                stored.get("bitrate_kbps"), stored.get("sample_rate_hz"))
     
     return {
         "success": True,
