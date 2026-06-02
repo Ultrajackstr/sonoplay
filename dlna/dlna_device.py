@@ -510,7 +510,11 @@ class DlnaDevice(object):
         """Return True if any of the device's services exposes ``action``."""
         try:
             return await self._find_service_by_action(action) is not None
-        except Exception:
+        except Exception as e:
+            # Fall back to "unsupported" but log it -- a transient error here
+            # otherwise silently (and, since the result is cached, permanently)
+            # disables features like gapless for the device.
+            logger.debug("%s supports_action(%s) failed: %s", self.name, action, e)
             return False
 
     def __getattr__(self, item):

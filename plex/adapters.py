@@ -97,7 +97,11 @@ class PlexLib(object):
             return
         self.protocol = query.get("protocol", self.protocol)
         self.address = query.get("address", self.address)
-        self.port = int(query.get("port", self.port))
+        port = query.get("port", self.port)
+        try:
+            self.port = int(port)
+        except (TypeError, ValueError):
+            pass  # keep the previous port on a missing/empty/malformed value
         self.token = query.get("token", self.token)
         self.machine_id = query.get("machineIdentifier", self.machine_id)
         self.client_identifier = query.get("clientIdentifier", self.client_identifier)

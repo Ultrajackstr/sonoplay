@@ -302,7 +302,12 @@ class Subscriber(object):
                              self, self.consecutive_errors, self.MAX_SEND_ERRORS, e)
 
     def __eq__(self, other):
-        return self.uuid == other.uuid
+        return isinstance(other, Subscriber) and self.uuid == other.uuid
+
+    def __hash__(self):
+        # Defining __eq__ without __hash__ makes instances unhashable in Py3;
+        # key on uuid to stay consistent with __eq__.
+        return hash(self.uuid)
 
     def __repr__(self):
         return f"{self.host}:{self.port}"
