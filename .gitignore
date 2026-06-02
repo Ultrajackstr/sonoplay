@@ -1,6 +1,8 @@
-# ── Documentation & Tests (managed outside repo) ──
+# ── Documentation (managed outside repo) ──
 docs/
-tests/
+# NOTE: tests/ is tracked. Do NOT ignore it, or newly-added test files are
+# silently dropped from git (they never show in `git status`). __pycache__/
+# under tests/ is still covered by the Python-artifacts rule below.
 
 # ── Python artifacts ──
 __pycache__/
