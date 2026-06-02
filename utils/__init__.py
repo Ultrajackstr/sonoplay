@@ -85,6 +85,22 @@ def unescape_xml(xml):
     return unescape(xml.decode())
 
 
+# Plex streaming/queue/device URLs carry the auth token in the query string
+# (?...X-Plex-Token=...). Logging the raw URL leaks that token into log files,
+# so route every URL through this before logging.
+_PLEX_TOKEN_RE = re.compile(r"(X-Plex-Token=)[^&\s]+", re.IGNORECASE)
+
+
+def redact_token(text):
+    """Mask any X-Plex-Token=<value> in a string so tokens don't reach logs.
+
+    Non-string input is stringified (so it's safe to wrap arbitrary log args).
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    return _PLEX_TOKEN_RE.sub(r"\1***", text)
+
+
 # UPnP service namespaces are version-qualified, e.g.
 # "urn:schemas-upnp-org:service:AVTransport:2". Renderers advertise different
 # service versions (AVTransport:1/2/3, RenderingControl:1/2/3, ...) and that

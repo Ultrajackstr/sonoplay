@@ -11,11 +11,33 @@ for _key in list(sys.modules):
         ):
             del sys.modules[_key]
 
-from utils import unescape_xml
+from utils import unescape_xml, redact_token
 
 
 def test_unescape_lt_gt():
     assert unescape_xml(b"&lt;a&gt;") == "<a>"
+
+
+def test_redact_token_in_query():
+    url = "https://h:32400/library/parts/1/file.flac?X-Plex-Token=transient-abc123&foo=1"
+    assert redact_token(url) == "https://h:32400/library/parts/1/file.flac?X-Plex-Token=***&foo=1"
+
+
+def test_redact_token_as_trailing_param():
+    assert redact_token("https://plex.tv/devices/x?X-Plex-Token=secretvalue") == \
+        "https://plex.tv/devices/x?X-Plex-Token=***"
+
+
+def test_redact_token_ampersand_param():
+    assert redact_token("a=1&X-Plex-Token=tok-123&b=2") == "a=1&X-Plex-Token=***&b=2"
+
+
+def test_redact_token_no_token_unchanged():
+    assert redact_token("http://h/file.flac?foo=1") == "http://h/file.flac?foo=1"
+
+
+def test_redact_token_non_str_is_stringified():
+    assert redact_token(None) == "None"
 
 
 def test_unescape_amp():

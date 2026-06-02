@@ -44,7 +44,7 @@ from dlna import (
 )
 from typing import List, Optional, Dict, Any
 from plex.subscribe import sub_man
-from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g, require_valid_uuid
+from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g, require_valid_uuid, redact_token
 from settings import settings
 import asyncio
 from dlna.dlna_device import DlnaDevice
@@ -935,7 +935,7 @@ async def timeline_poll(request: Request,
             msg = await sub_man.msg_for_device(device)
         msg = msg.format(command_id=commandID)
         if datetime.now(timezone.utc) - begin_time >= timedelta(milliseconds=500):
-            logger.debug(f"Slow poll request: {request.url} took {datetime.now(timezone.utc) - begin_time}")
+            logger.debug("Slow poll request: %s took %s", redact_token(str(request.url)), datetime.now(timezone.utc) - begin_time)
         asyncio.create_task(sub_man.notify_server_device(device, force=True))
         return await build_response(msg, device=device, headers=timeline_poll_headers(device))
     finally:

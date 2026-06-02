@@ -36,7 +36,7 @@ from dotmap import DotMap
 from starlette.datastructures import QueryParams
 
 from plex.play_queue import PlayQueue
-from utils import parse_timedelta, convert_volume, g, pms_header, extract_value
+from utils import parse_timedelta, convert_volume, g, pms_header, extract_value, redact_token
 from settings import settings
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -449,10 +449,10 @@ class DlnaState(object):
         if self.state == state and self.current_uri == uri and self.elapsed == elapsed:
             return
         if __debug__:
-            logger.debug("%s real update state from sub %s %s %s", self.dlna.name, state, uri, elapsed)
+            logger.debug("%s real update state from sub %s %s %s", self.dlna.name, state, redact_token(uri), elapsed)
         async with self.change_session_lock:
             if __debug__:
-                logger.debug("%s real update state from sub in lock %s %s %s", self.dlna.name, state, uri, elapsed)
+                logger.debug("%s real update state from sub in lock %s %s %s", self.dlna.name, state, redact_token(uri), elapsed)
             self.begin_change_session()
             self.state = state
             self.current_uri = uri
@@ -471,7 +471,7 @@ class DlnaState(object):
         if self.state == state and self.current_uri == uri and self.elapsed == elapsed:
             return
         if __debug__:
-            logger.debug("%s applying state update without loop %s %s %s", self.dlna.name, state, uri, elapsed)
+            logger.debug("%s applying state update without loop %s %s %s", self.dlna.name, state, redact_token(uri), elapsed)
         self.begin_change_session()
         self.state = state
         self.current_uri = uri
@@ -573,7 +573,7 @@ class PlexDlnaAdapter(object):
         # Reset premature STOPPED tracking
         self._seen_playing_since_operation = False
         self._operation_start_time = time.monotonic()
-        logger.debug("%s transport operation %d started for %s", self.dlna.name, self._active_operation_id, target_uri)
+        logger.debug("%s transport operation %d started for %s", self.dlna.name, self._active_operation_id, redact_token(target_uri))
         return self._active_operation_id
 
     def _finish_transport_operation(self, operation_id: int) -> None:
@@ -825,11 +825,11 @@ class PlexDlnaAdapter(object):
                             # is a phantom from our internal state update racing with
                             # the polling cycle.  Restore the target and keep waiting.
                             logger.debug("%s ignoring phantom URI reversion (device never confirmed target)", self.dlna.name)
-                        logger.debug("%s reverting URI %s -> restoring target %s", self.dlna.name, changed_state.current_uri, self._active_target_uri)
+                        logger.debug("%s reverting URI %s -> restoring target %s", self.dlna.name, redact_token(changed_state.current_uri), redact_token(self._active_target_uri))
                         self.state.update(uri=self._active_target_uri)
                         return
                     if __debug__:
-                        logger.debug("%s received uri %s while targeting %s", self.dlna.name, changed_state.current_uri, self._active_target_uri)
+                        logger.debug("%s received uri %s while targeting %s", self.dlna.name, redact_token(changed_state.current_uri), redact_token(self._active_target_uri))
             if 'state' in changed_state:
                 if changed_state.state in ("PLAYING", "PAUSED_PLAYBACK"):
                     self._active_operation_state_ready = True
@@ -995,13 +995,13 @@ class PlexDlnaAdapter(object):
                 while True:
                     attempt += 1
                     if attempt > 1:
-                        logger.debug("%s retrying transport load attempt %d for %s", self.dlna.name, attempt, url)
+                        logger.debug("%s retrying transport load attempt %d for %s", self.dlna.name, attempt, redact_token(url))
                         self._reset_active_operation_tracking()
                     await self._issue_transport_commands(url, offset=offset if attempt == 1 else 0, paused=paused)
                     settled = await self._await_transport_settle(operation_id)
                     if settled or attempt >= self._transport_max_attempts:
                         if not settled:
-                            logger.warning("%s transport load timed out after %d attempts for %s", self.dlna.name, attempt, url)
+                            logger.warning("%s transport load timed out after %d attempts for %s", self.dlna.name, attempt, redact_token(url))
                         break
             finally:
                 self._finish_transport_operation(operation_id)
@@ -1066,7 +1066,7 @@ class PlexDlnaAdapter(object):
             await self.dlna.SetNextAVTransportURI(url)
             self._armed_next_uri = url
             self._armed_next_offset = offset
-            logger.debug("%s gapless armed next (offset %s): %s", self.dlna.name, offset, url)
+            logger.debug("%s gapless armed next (offset %s): %s", self.dlna.name, offset, redact_token(url))
         except Exception:
             logger.warning("%s gapless: SetNextAVTransportURI failed", self.dlna.name)
 
@@ -1117,7 +1117,7 @@ class PlexDlnaAdapter(object):
             self.state.update(uri=None)
         else:
             self.state.update(uri=url)
-        logger.debug("%s SetAVTransportURI: %s", self.dlna.name, url)
+        logger.debug("%s SetAVTransportURI: %s", self.dlna.name, redact_token(url))
         await self.dlna.SetAVTransportURI(url)
         if offset != 0:
             self.state.update(position=str(timedelta(milliseconds=offset)))
@@ -1331,7 +1331,7 @@ class PlexDlnaAdapter(object):
         if not pos:
             pos = ""
         if __debug__:
-            logger.debug("%s update state from sub %s %s %s", self.dlna.name, state, uri, pos)
+            logger.debug("%s update state from sub %s %s %s", self.dlna.name, state, redact_token(uri), pos)
         self.state.update(state=state, uri=uri, position=pos)
 
     @property
