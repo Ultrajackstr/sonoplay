@@ -183,3 +183,40 @@ def test_settle_window_boundary_is_exclusive():
     # Exactly at the window edge the device value is reported as-is.
     adapter = _smooth_adapter(last_advance=1000.0)
     assert _smooth(adapter, 388000, now=1005.0) == 388000
+
+
+# --- transport-operation override: don't freeze the timeline at 0 -------------
+# During an explicit load (auto-next / track change) the AMBEO keeps playing the
+# new track while wait_for_can_play burns its full 5s timeout. _transport_state_
+# override otherwise pins time=0 for that whole window, so the new track shows
+# frozen at 0:00 then jumps to 0:05. Once the renderer is on the target URI we
+# report its real position instead.
+
+def _override_adapter(target_uri, current_uri, paused=False):
+    return types.SimpleNamespace(
+        _active_operation_target_paused=paused,
+        _active_target_uri=target_uri,
+        state=types.SimpleNamespace(current_uri=current_uri),
+    )
+
+
+def _override_time(adapter, capped_time_ms):
+    return PlexDlnaAdapter._override_reported_time(adapter, capped_time_ms)
+
+
+def test_override_reports_real_time_once_on_target_uri():
+    # Device has switched to the track we're loading -> report its real position.
+    adapter = _override_adapter(target_uri="u://next", current_uri="u://next")
+    assert _override_time(adapter, 3000) == 3000
+
+
+def test_override_pins_zero_while_still_transitioning():
+    # Device not yet on the target URI -> genuinely transitioning, pin 0.
+    adapter = _override_adapter(target_uri="u://next", current_uri="u://old")
+    assert _override_time(adapter, 3000) == 0
+
+
+def test_override_pins_zero_for_pause_operation():
+    # A pause load keeps the existing behaviour (0) regardless of URI.
+    adapter = _override_adapter(target_uri="u://next", current_uri="u://next", paused=True)
+    assert _override_time(adapter, 3000) == 0

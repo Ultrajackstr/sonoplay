@@ -1382,6 +1382,23 @@ class PlexDlnaAdapter(object):
             return plausible_max
         return device_elapsed_ms
 
+    def _override_reported_time(self, capped_time_ms):
+        """Position to report while a transport operation is in flight.
+
+        An explicit load (auto-next / track change) keeps _transport_state_
+        override set until the operation settles. On the AMBEO that takes the
+        full wait_for_can_play timeout (~5s) because the renderer is already
+        playing the new track and never advertises "Play". Pinning 0 for that
+        whole window freezes the new track at 0:00 and then jumps it to ~0:05.
+        Once the device is actually on the target URI, report its real (already
+        capped) position; only pin 0 while genuinely still transitioning, and
+        keep the legacy 0 for an explicit pause load.
+        """
+        if not self._active_operation_target_paused \
+                and self.state.current_uri == self._active_target_uri:
+            return capped_time_ms
+        return 0
+
     async def get_state(self):
         if self.state is None or self.state.state in ("STOPPED", "NO_MEDIA_PRESENT", None) or self.queue is None:
             return {}
@@ -1425,7 +1442,7 @@ class PlexDlnaAdapter(object):
             pass
         if self._transport_state_override:
             state['state'] = 'paused' if self._active_operation_target_paused else 'playing'
-            state['time'] = 0
+            state['time'] = self._override_reported_time(state['time'])
         return state
 
     def __del__(self):
