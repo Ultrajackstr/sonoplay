@@ -835,6 +835,11 @@ class PlexDlnaAdapter(object):
                 and 'current_uri' in changed_state
                 and changed_state.current_uri == self._armed_next_uri):
             logger.info("%s gapless: renderer advanced to pre-armed next track", self.dlna.name)
+            # The new track restarts at 0; drop the carried-over position/
+            # duration so the timeline doesn't momentarily report the previous
+            # track's time against the new (often shorter) track.
+            self.state._elapsed = 0
+            self.state._current_track_duration = 0
             asyncio.run_coroutine_threadsafe(self._handle_gapless_advance(), self.loop)
             asyncio.run_coroutine_threadsafe(self.state_changed(changed_state), self.loop)
             return
@@ -1351,6 +1356,16 @@ class PlexDlnaAdapter(object):
         }
         state.update(track_info)
         state.update(lib_info)
+        # Never report a position beyond the current track's duration. A gapless
+        # cross-over can briefly leave the previous track's time attached to the
+        # new track's (shorter) metadata, and Plex rejects time > duration with
+        # HTTP 400. Treat a clearly-stale time as the start of the new track.
+        track_duration = track_info.get('duration')
+        try:
+            if track_duration and int(state.get('time') or 0) > int(track_duration):
+                state['time'] = 0
+        except (TypeError, ValueError):
+            pass
         if self._transport_state_override:
             state['state'] = 'paused' if self._active_operation_target_paused else 'playing'
             state['time'] = 0
