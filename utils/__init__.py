@@ -107,6 +107,9 @@ def xml2dict(xml):
         "http://schemas.xmlsoap.org/soap/envelope/": None,
         "urn:schemas-upnp-org:event-1-0": None,
         "urn:schemas-upnp-org:metadata-1-0/AVT/": None,
+        # SOAP Fault detail (UPnPError errorCode/errorDescription) lives here;
+        # collapse it so control() can log the real UPnP error, not "UPnPError".
+        "urn:schemas-upnp-org:control-1-0": None,
     })
     parsed = xmltodict.parse(xml, process_namespaces=True, namespaces=namespaces)
     return DotMap(parsed)

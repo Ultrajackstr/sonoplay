@@ -143,3 +143,23 @@ def test_lastchange_event_parsing_unaffected():
     )
     info = xml2dict(event)
     assert info.propertyset.property.LastChange == "<Event/>"
+
+
+def test_soap_fault_exposes_upnp_error_code():
+    """SOAP Faults carry the UPnP error in the control-1-0 namespace.
+
+    That namespace must collapse too, so DlnaDeviceService.control can log the
+    real errorCode/errorDescription (e.g. 701 "Transition not available")
+    instead of a bare "UPnPError".
+    """
+    fault = _soap_response(
+        "<s:Fault><faultcode>s:Client</faultcode>"
+        "<faultstring>UPnPError</faultstring><detail>"
+        '<UPnPError xmlns="urn:schemas-upnp-org:control-1-0">'
+        "<errorCode>701</errorCode>"
+        "<errorDescription>Transition not available</errorDescription>"
+        "</UPnPError></detail></s:Fault>"
+    )
+    upnp_error = xml2dict(fault).Envelope.Body.Fault.detail.UPnPError
+    assert upnp_error.get("errorCode") == "701"
+    assert upnp_error.get("errorDescription") == "Transition not available"

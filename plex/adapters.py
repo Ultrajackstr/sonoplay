@@ -999,6 +999,13 @@ class PlexDlnaAdapter(object):
             await self.pause()
         else:
             await asyncio.sleep(0.1)
+            # Wait until the renderer reports it can accept Play before issuing
+            # it. Devices like the Rygel-based AMBEO (AVTransport:2) reject Play
+            # with UPnP 701 "Transition not available" when it arrives too soon
+            # after SetAVTransportURI, which silently stops playback at track
+            # changes (auto-next). Falls through after a short timeout if the
+            # device doesn't support GetCurrentTransportActions.
+            await self.dlna.wait_for_can_play()
             await self.play()
 
     async def _await_transport_settle(self, operation_id: int) -> bool:
