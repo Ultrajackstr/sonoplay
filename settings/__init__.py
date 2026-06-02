@@ -108,11 +108,13 @@ class Settings(BaseSettings):
     config_path: str = "config"
     data_file_name: str = "data.json"
     enable_onboarding_wizard: bool = True
-    # Audio transcoding thresholds - exceeding these triggers Plex transcode
-    # Sonos speakers typically support up to ~320kbps for network streams
-    # and max 48kHz sample rate. CD quality is 1411 kbps at 44.1kHz.
-    audio_transcode_threshold_kbps: int | None = 1500  # Safe default for most DLNA
-    audio_transcode_max_sample_rate_hz: int | None = 48000  # Max for Sonos/most DLNA
+    # Audio transcoding thresholds - exceeding these triggers Plex transcode.
+    # Default OFF (None = no limit): most DLNA renderers, incl. the AMBEO, play
+    # hi-res FLAC directly, and transcoding adds churn/instability at track
+    # changes. Set a limit (e.g. 320 kbps / 48000 Hz) for devices that need it
+    # (some Sonos models); these are also configurable from the web UI.
+    audio_transcode_threshold_kbps: int | None = None
+    audio_transcode_max_sample_rate_hz: int | None = None
     
     # HTTP timeout settings (in seconds)
     http_timeout_default: float = 10.0  # Default timeout for all requests

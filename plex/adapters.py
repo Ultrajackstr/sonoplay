@@ -1356,14 +1356,16 @@ class PlexDlnaAdapter(object):
         }
         state.update(track_info)
         state.update(lib_info)
-        # Never report a position beyond the current track's duration. A gapless
-        # cross-over can briefly leave the previous track's time attached to the
-        # new track's (shorter) metadata, and Plex rejects time > duration with
-        # HTTP 400. Treat a clearly-stale time as the start of the new track.
-        track_duration = track_info.get('duration')
+        # Keep the reported position within the current track's duration (Plex
+        # rejects time > duration with HTTP 400). A gapless cross-over can leave
+        # the previous track's much-larger time attached to the new (shorter)
+        # track -> treat that as the start of the new track. A small overshoot
+        # past the metadata duration at a normal track end is just capped, so
+        # the timer never jumps to 0 near the end nor reads past the maximum.
         try:
-            if track_duration and int(state.get('time') or 0) > int(track_duration):
-                state['time'] = 0
+            track_duration = int(track_info.get('duration') or 0)
+            if track_duration and int(state.get('time') or 0) > track_duration:
+                state['time'] = track_duration
         except (TypeError, ValueError):
             pass
         if self._transport_state_override:
