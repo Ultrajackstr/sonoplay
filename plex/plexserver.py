@@ -541,7 +541,7 @@ async def api_delete_virtual_device(virtual_uuid: str):
     require_valid_uuid(virtual_uuid)
     try:
         await delete_virtual_device(virtual_uuid)
-        logger.info(f"Virtual device deleted: {virtual_uuid}")
+        logger.info("Virtual device deleted: %s", virtual_uuid)
     except Exception as exc:
         _virtual_device_error_to_http(exc)
     return Response(status_code=204)
@@ -683,7 +683,7 @@ async def link_device(request: Request,
         pin_login.clear_pin_cache(uuid)
         pin, new_pin_id = await pin_login.get_pin(device)
         await adapter.update_plex_tv_connection()
-        logger.info(f"Device unlinked from Plex: {device.name} ({uuid})")
+        logger.info("Device unlinked from Plex: %s (%s)", device.name, uuid)
         return {"status": "unlinked", "pin": pin, "pin_id": new_pin_id}
     
     if pin_id:
@@ -693,7 +693,7 @@ async def link_device(request: Request,
             # Clear the cached PIN after successful linking
             pin_login.clear_pin_cache(uuid)
             await adapter.update_plex_tv_connection()
-            logger.info(f"Device linked to Plex: {device.name} ({uuid})")
+            logger.info("Device linked to Plex: %s (%s)", device.name, uuid)
             return {"status": "linked", "message": "Device successfully linked"}
         else:
             # Get the PIN to return it to the user
@@ -915,7 +915,7 @@ async def timeline_poll(request: Request,
         current_count = _waiting_poll_count
     try:
         if current_count > 3:
-            logger.debug(f"High poll count: {current_count}")
+            logger.debug("High poll count: %s", current_count)
         begin_time = datetime.now(timezone.utc)
         await guess_host_ip(request)
         sub_man.update_command_id(target_uuid, client_uuid, commandID)
@@ -930,7 +930,7 @@ async def timeline_poll(request: Request,
                 'state', 'volume', 'current_uri', 'elapsed_jump'])
         msg = await sub_man.msg_for_device(device)
         while msg is None:
-            logger.debug(f"Waiting for message: {target_uuid}")
+            logger.debug("Waiting for message: %s", target_uuid)
             await asyncio.sleep(settings.plex_notify_interval)
             msg = await sub_man.msg_for_device(device)
         msg = msg.format(command_id=commandID)
