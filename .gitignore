@@ -69,6 +69,12 @@ logs/
 # ── Docker overrides ──
 docker-compose.override.yml
 
+# ── Local host-test scaffolding (not committed) ──
+docker-compose.windows.yml
+tools/check_position.py
+
 # ── Misc loose root files ──
 start.sh
 .git.bak/
+
+claude-portable/

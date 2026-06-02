@@ -85,18 +85,30 @@ def unescape_xml(xml):
     return unescape(xml.decode())
 
 
+# UPnP service namespaces are version-qualified, e.g.
+# "urn:schemas-upnp-org:service:AVTransport:2". Renderers advertise different
+# service versions (AVTransport:1/2/3, RenderingControl:1/2/3, ...) and that
+# version appears in the namespace of every "<Action>Response" element. We must
+# collapse it to the bare local name so DlnaDeviceService.control can look the
+# payload up as e.g. "GetPositionInfoResponse" regardless of the device's
+# version. Matching only ":1" left :2/:3 devices (e.g. Rygel-based renderers)
+# with version-qualified keys, so GetPositionInfo returned None and the Plex
+# timeline position was stuck at 0.
+_UPNP_SERVICE_NS_RE = re.compile(r"urn:schemas-upnp-org:service:[A-Za-z0-9]+:\d+")
+
+
 def xml2dict(xml):
     if not isinstance(xml, str):
         xml = unescape_xml(xml)
-    parsed = xmltodict.parse(xml,
-                             process_namespaces=True,
-                             namespaces={
-                                 UPNP_AVT_SERVICE_TYPE: None,
-                                 UPNP_RC_SERVICE_TYPE: None,
-                                 "http://schemas.xmlsoap.org/soap/envelope/": None,
-                                 "urn:schemas-upnp-org:event-1-0": None,
-                                 "urn:schemas-upnp-org:metadata-1-0/AVT/": None
-                             })
+    # Collapse every UPnP service namespace present in the document, plus the
+    # SOAP envelope and GENA event/metadata namespaces, to bare local names.
+    namespaces = {ns: None for ns in set(_UPNP_SERVICE_NS_RE.findall(xml))}
+    namespaces.update({
+        "http://schemas.xmlsoap.org/soap/envelope/": None,
+        "urn:schemas-upnp-org:event-1-0": None,
+        "urn:schemas-upnp-org:metadata-1-0/AVT/": None,
+    })
+    parsed = xmltodict.parse(xml, process_namespaces=True, namespaces=namespaces)
     return DotMap(parsed)
 
 
