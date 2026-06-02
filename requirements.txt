@@ -1,3 +1,8 @@
+# Pinned runtime dependency lock — this is what the Docker image installs
+# (pip install -r requirements.txt). pyproject.toml [project.dependencies] holds
+# the abstract version floors used for dev installs (pip install -e .[dev]); the
+# two are kept consistent (every pin here satisfies the matching pyproject floor)
+# and must be bumped together.
 aiodns==3.1.1
 aiohttp==3.13.3
 brotli==1.2.0
