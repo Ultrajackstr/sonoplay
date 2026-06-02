@@ -757,6 +757,15 @@ async def refresh_play_queue(request: Request,
     return await build_response("", device=device)
 
 
+async def _adapter_or_404(target_uuid: str):
+    """Resolve the adapter for a music transport command, raising 404 if the
+    device is unknown. Shared preamble for stop/next/prev/seek/skipTo/setParameters."""
+    device = await get_device_by_uuid(target_uuid)
+    if device is None:
+        raise HTTPException(404, f"device not found {target_uuid}")
+    return await adapter_by_device(device)
+
+
 @s.get("/player/playback/play")
 async def play(commandID: int,
                type_: str = Query("music", alias="type"),
@@ -801,10 +810,7 @@ async def stop(request: Request,
     await guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         await adapter.stop()
     return await build_response(XML_OK, target_uuid=target_uuid)
 
@@ -817,10 +823,7 @@ async def next_(commandID: int,
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         await adapter.next()
     return await build_response("", target_uuid=target_uuid)
 
@@ -833,10 +836,7 @@ async def prev(commandID: int,
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         await adapter.prev()
     return await build_response("", target_uuid=target_uuid)
 
@@ -850,10 +850,7 @@ async def seek(commandID: int,
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         await adapter.seek(offset)
     return await build_response("", target_uuid=target_uuid)
 
@@ -867,10 +864,7 @@ async def skip_to(commandID: int,
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == "music":
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         await adapter.skip_to_track(key)
     return await build_response("", target_uuid=target_uuid)
 
@@ -886,10 +880,7 @@ async def set_parameters(commandID: int,
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
     if type_ == 'music':
-        device = await get_device_by_uuid(target_uuid)
-        if device is None:
-            raise HTTPException(404, f"device not found {target_uuid}")
-        adapter = await adapter_by_device(device)
+        adapter = await _adapter_or_404(target_uuid)
         if shuffle is not None:
             adapter.shuffle = shuffle
         if repeat is not None:
