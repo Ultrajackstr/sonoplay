@@ -1073,10 +1073,17 @@ class PlexDlnaAdapter(object):
         self._armed_next_offset = None
         if offset is None or self.queue is None:
             return
+        sync_start = time.monotonic()
         try:
             await self.queue.set_selected_offset(offset)
             self.current_track_info = await self.queue.selected_track()
-            logger.info("%s gapless advanced to queue offset %s", self.dlna.name, offset)
+            # The displayed track label only updates once this completes, while
+            # the device's elapsed has already crossed into the next track. A
+            # slow set_selected_offset (queue expansion via the Plex API) is the
+            # prime suspect for the previous track appearing to overshoot, so log
+            # how long the sync took.
+            logger.info("%s gapless advanced to queue offset %s (queue-sync %.2fs)",
+                        self.dlna.name, offset, time.monotonic() - sync_start)
         except Exception:
             logger.exception("%s gapless: failed to sync queue on advance", self.dlna.name)
         await self._arm_next_track()
@@ -1355,12 +1362,12 @@ class PlexDlnaAdapter(object):
         if shuffle > 0 and not await self.queue.allow_shuffle():
             shuffle = 0
         track_info = await self.queue.get_track_info()
-        time = self.state.elapsed
+        elapsed_ms = self.state.elapsed
         volume = self.state.volume
         mute = "1" if self.state.muted else "0"
         state = {
             'state': self.plex_state,
-            'time': time,
+            'time': elapsed_ms,
             'volume': volume,
             'mute': mute,
             'shuffle': shuffle,
@@ -1376,7 +1383,33 @@ class PlexDlnaAdapter(object):
         # the timer never jumps to 0 near the end nor reads past the maximum.
         try:
             track_duration = int(track_info.get('duration') or 0)
-            if track_duration and int(state.get('time') or 0) > track_duration:
+            overshoot = bool(track_duration and elapsed_ms > track_duration)
+            # DIAGNOSTIC (DEBUG only): the displayed track label comes from the
+            # play-queue offset (queue.selected_track) while `time` comes from
+            # the device's RelTime. At a gapless cross-over the device moves on
+            # immediately but the label only updates once _handle_gapless_advance
+            # finishes set_selected_offset(); if that lags, the old track appears
+            # to overshoot and the next one starts a few seconds in. Log the
+            # cross-over state on any overshoot or inside the settle window so a
+            # single reproduction pinpoints where the lag is.
+            if __debug__:
+                settling = bool(
+                    self._last_gapless_advance
+                    and (time.monotonic() - self._last_gapless_advance) < self._gapless_settle_seconds
+                )
+                if overshoot or settling:
+                    try:
+                        sel_offset = await self.queue.selected_offset()
+                    except Exception:
+                        sel_offset = "?"
+                    logger.debug(
+                        "%s timeline-probe: elapsed=%s dur=%s key=%s sel_offset=%s "
+                        "dev_uri=%s armed_uri=%s armed_off=%s overshoot=%s settling=%s",
+                        self.dlna.name, elapsed_ms, track_duration, track_info.get('key'),
+                        sel_offset, self.state.current_uri, self._armed_next_uri,
+                        self._armed_next_offset, overshoot, settling,
+                    )
+            if overshoot:
                 state['time'] = track_duration
         except (TypeError, ValueError):
             pass
