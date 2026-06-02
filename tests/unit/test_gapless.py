@@ -134,3 +134,52 @@ def test_auto_next_fires_after_gapless_settle_window():
     changed = _Attr(elapsed=196000, old=_Attr(elapsed=195000))
     with patch("asyncio.run_coroutine_threadsafe", _consume):
         assert PlexDlnaAdapter.check_auto_next(adapter, changed) is True
+
+
+# --- gapless settle-window position smoothing ---------------------------------
+# The renderer briefly reports the *previous* track's near-end RelTime for a poll
+# or two right after a gapless cross-over (observed on the AMBEO: 388000ms on a
+# 395500ms track). The freshly-advanced track restarted at 0, so any large value
+# inside the settle window is stale and must not be forwarded to the timeline.
+
+def _smooth_adapter(last_advance, settle=5.0, slack_ms=3000):
+    return types.SimpleNamespace(
+        _last_gapless_advance=last_advance,
+        _gapless_settle_seconds=settle,
+        _gapless_settle_slack_ms=slack_ms,
+    )
+
+
+def _smooth(adapter, device_elapsed_ms, now):
+    return PlexDlnaAdapter._settle_smoothed_time(adapter, device_elapsed_ms, now)
+
+
+def test_stale_spike_during_settle_is_clamped():
+    # cross-over at t=1000.0; 2s later the device emits the previous track's
+    # near-end position -> clamp to wall-clock(2s)+slack(3s) = 5000ms.
+    adapter = _smooth_adapter(last_advance=1000.0)
+    assert _smooth(adapter, 388000, now=1002.0) == 5000
+
+
+def test_plausible_position_during_settle_passes():
+    # A value consistent with a freshly-started track is left untouched.
+    adapter = _smooth_adapter(last_advance=1000.0)
+    assert _smooth(adapter, 1500, now=1002.0) == 1500
+
+
+def test_spike_outside_settle_window_passes():
+    # Once the window has closed the device value is authoritative again.
+    adapter = _smooth_adapter(last_advance=1000.0)
+    assert _smooth(adapter, 388000, now=1010.0) == 388000
+
+
+def test_no_gapless_advance_passes_through():
+    # No recent cross-over -> never smooth (e.g. normal playback / explicit seek).
+    adapter = _smooth_adapter(last_advance=0.0)
+    assert _smooth(adapter, 388000, now=1002.0) == 388000
+
+
+def test_settle_window_boundary_is_exclusive():
+    # Exactly at the window edge the device value is reported as-is.
+    adapter = _smooth_adapter(last_advance=1000.0)
+    assert _smooth(adapter, 388000, now=1005.0) == 388000

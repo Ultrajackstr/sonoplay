@@ -542,6 +542,10 @@ class PlexDlnaAdapter(object):
         # auto-next for a short settling window so it isn't spuriously skipped.
         self._last_gapless_advance = 0.0
         self._gapless_settle_seconds = 5.0
+        # Within the settle window the new track restarted at 0, so any reported
+        # position beyond wall-clock-since-advance + this slack is a stale spike
+        # (the renderer echoing the previous track's RelTime) and is clamped.
+        self._gapless_settle_slack_ms = 3000
 
     async def _with_no_notice(self, coro):
         """Wrap a coroutine so no_notice is True while it runs on the main loop."""
@@ -1101,9 +1105,12 @@ class PlexDlnaAdapter(object):
         }
 
     async def _issue_transport_commands(self, url: str, *, offset: int, paused: bool) -> None:
-        # An explicit SetAVTransportURI resets any pre-armed gapless "next".
+        # An explicit SetAVTransportURI resets any pre-armed gapless "next" and
+        # ends the post-cross-over settle window (this is a deliberate user
+        # action, not a stale auto-advance, so position smoothing must not apply).
         self._armed_next_uri = None
         self._armed_next_offset = None
+        self._last_gapless_advance = 0.0
         self.state.update(state="TRANSITIONING")
         self.state.check_all_next_loop = True
         if url == self.state.current_uri:
@@ -1354,6 +1361,27 @@ class PlexDlnaAdapter(object):
         d['X-Plex-Token'] = self.plex_lib.token
         return d
 
+    def _settle_smoothed_time(self, device_elapsed_ms, now_monotonic):
+        """Filter stale position spikes during the gapless settle window.
+
+        After a gapless cross-over the freshly-advanced track has restarted at
+        0, but the renderer can briefly echo the *previous* track's near-end
+        RelTime for a poll or two (observed on the AMBEO: 388000ms reported on a
+        395500ms track). Any value far above wall-clock-since-advance is
+        therefore stale; clamp it so the reported timeline climbs smoothly from
+        0 instead of jumping. Outside the window (or with no recent advance) the
+        device value is returned unchanged.
+        """
+        if not self._last_gapless_advance:
+            return device_elapsed_ms
+        age = now_monotonic - self._last_gapless_advance
+        if age < 0 or age >= self._gapless_settle_seconds:
+            return device_elapsed_ms
+        plausible_max = int(age * 1000) + self._gapless_settle_slack_ms
+        if device_elapsed_ms > plausible_max:
+            return plausible_max
+        return device_elapsed_ms
+
     async def get_state(self):
         if self.state is None or self.state.state in ("STOPPED", "NO_MEDIA_PRESENT", None) or self.queue is None:
             return {}
@@ -1362,7 +1390,17 @@ class PlexDlnaAdapter(object):
         if shuffle > 0 and not await self.queue.allow_shuffle():
             shuffle = 0
         track_info = await self.queue.get_track_info()
-        elapsed_ms = self.state.elapsed
+        raw_elapsed_ms = self.state.elapsed
+        # The renderer occasionally echoes the previous track's near-end RelTime
+        # for a poll or two right after a gapless cross-over; the next track has
+        # restarted at 0, so smooth those stale spikes out within the settle
+        # window (display only -- state.elapsed and auto-next are untouched), or
+        # else the timeline appears to overshoot the old track and start the new
+        # one several seconds in.
+        elapsed_ms = self._settle_smoothed_time(raw_elapsed_ms, time.monotonic())
+        if __debug__ and elapsed_ms != raw_elapsed_ms:
+            logger.debug("%s timeline-smooth: raw=%s -> %s (gapless settle)",
+                         self.dlna.name, raw_elapsed_ms, elapsed_ms)
         volume = self.state.volume
         mute = "1" if self.state.muted else "0"
         state = {
@@ -1375,41 +1413,13 @@ class PlexDlnaAdapter(object):
         }
         state.update(track_info)
         state.update(lib_info)
-        # Keep the reported position within the current track's duration (Plex
-        # rejects time > duration with HTTP 400). A gapless cross-over can leave
-        # the previous track's much-larger time attached to the new (shorter)
-        # track -> treat that as the start of the new track. A small overshoot
-        # past the metadata duration at a normal track end is just capped, so
-        # the timer never jumps to 0 near the end nor reads past the maximum.
+        # Backstop: keep the reported position within the current track's
+        # duration (Plex rejects time > duration with HTTP 400). A small
+        # overshoot past the metadata duration at a normal track end is just
+        # capped, so the timer never jumps to 0 near the end nor reads past max.
         try:
             track_duration = int(track_info.get('duration') or 0)
-            overshoot = bool(track_duration and elapsed_ms > track_duration)
-            # DIAGNOSTIC (DEBUG only): the displayed track label comes from the
-            # play-queue offset (queue.selected_track) while `time` comes from
-            # the device's RelTime. At a gapless cross-over the device moves on
-            # immediately but the label only updates once _handle_gapless_advance
-            # finishes set_selected_offset(); if that lags, the old track appears
-            # to overshoot and the next one starts a few seconds in. Log the
-            # cross-over state on any overshoot or inside the settle window so a
-            # single reproduction pinpoints where the lag is.
-            if __debug__:
-                settling = bool(
-                    self._last_gapless_advance
-                    and (time.monotonic() - self._last_gapless_advance) < self._gapless_settle_seconds
-                )
-                if overshoot or settling:
-                    try:
-                        sel_offset = await self.queue.selected_offset()
-                    except Exception:
-                        sel_offset = "?"
-                    logger.debug(
-                        "%s timeline-probe: elapsed=%s dur=%s key=%s sel_offset=%s "
-                        "dev_uri=%s armed_uri=%s armed_off=%s overshoot=%s settling=%s",
-                        self.dlna.name, elapsed_ms, track_duration, track_info.get('key'),
-                        sel_offset, self.state.current_uri, self._armed_next_uri,
-                        self._armed_next_offset, overshoot, settling,
-                    )
-            if overshoot:
+            if track_duration and elapsed_ms > track_duration:
                 state['time'] = track_duration
         except (TypeError, ValueError):
             pass
