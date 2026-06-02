@@ -530,6 +530,13 @@ class PlexDlnaAdapter(object):
         # Premature STOPPED filtering (LMS-uPnP #63, go2tv #43)
         self._seen_playing_since_operation = False
         self._operation_start_time: Optional[float] = None
+        # Gapless playback (settings.gapless). When the renderer supports
+        # SetNextAVTransportURI we pre-arm the next track so it auto-advances at
+        # the true end (no reload gap). _armed_next_uri is what we last told the
+        # device to play next; _armed_next_offset is that track's queue offset.
+        self._gapless_supported: Optional[bool] = None
+        self._armed_next_uri: Optional[str] = None
+        self._armed_next_offset: Optional[int] = None
 
     async def _with_no_notice(self, coro):
         """Wrap a coroutine so no_notice is True while it runs on the main loop."""
@@ -821,6 +828,16 @@ class PlexDlnaAdapter(object):
                     logger.debug("%s ignoring STOP during active transport operation", self.dlna.name)
                     self.state.update(state="TRANSITIONING")
                     return
+        # Gapless: the renderer crossed over to the track we pre-armed (its URI
+        # changed to our armed "next" with no operation in flight). Sync our
+        # queue to it instead of treating it as an external/auto-next event.
+        if (self._armed_next_uri and not self._active_operation_id
+                and 'current_uri' in changed_state
+                and changed_state.current_uri == self._armed_next_uri):
+            logger.info("%s gapless: renderer advanced to pre-armed next track", self.dlna.name)
+            asyncio.run_coroutine_threadsafe(self._handle_gapless_advance(), self.loop)
+            asyncio.run_coroutine_threadsafe(self.state_changed(changed_state), self.loop)
+            return
         # Post-operation protection: detect spurious STOPPED immediately after operation finish
         if self._check_post_operation_false_stop(changed_state):
             return
@@ -968,6 +985,84 @@ class PlexDlnaAdapter(object):
             finally:
                 self._finish_transport_operation(operation_id)
             self.current_track_info = track
+        # Gapless: pre-arm the next track so the renderer crosses over at the
+        # true end of this one instead of stopping and waiting for us to reload.
+        await self._arm_next_track()
+
+    async def _gapless_supported_now(self) -> bool:
+        """True if gapless is enabled and the device exposes SetNextAVTransportURI."""
+        if not settings.gapless:
+            return False
+        if self._gapless_supported is None:
+            self._gapless_supported = await self.dlna.supports_action("SetNextAVTransportURI")
+            logger.info("%s gapless %s", self.dlna.name,
+                        "enabled" if self._gapless_supported else "unsupported by device")
+        return self._gapless_supported
+
+    async def _compute_gapless_next(self):
+        """Return (offset, url) of the track to pre-arm, or None if not applicable."""
+        if self.queue is None:
+            return None
+        if self.shuffle > 0:
+            # Shuffle chooses the next track randomly at advance time.
+            return None
+        current = await self.queue.selected_offset()
+        total = await self.queue.total_count()
+        if self.queue.repeat == 1:            # repeat-one
+            next_offset = current
+        else:
+            next_offset = current + 1
+            if not math.isinf(total) and next_offset >= total:
+                if self.queue.repeat == 2:    # repeat-all -> wrap
+                    next_offset = 0
+                else:
+                    return None               # last track; nothing to arm
+        try:
+            track = await self.queue.track(next_offset)
+            url = self.queue.url_for_track(track, force_transcode=not self.queue.is_track_playable(track))
+        except Exception:
+            logger.exception("%s gapless: failed to resolve next track", self.dlna.name)
+            return None
+        return next_offset, url
+
+    async def _arm_next_track(self) -> None:
+        if not await self._gapless_supported_now():
+            return
+        nxt = await self._compute_gapless_next()
+        if nxt is None:
+            if self._armed_next_uri is not None:
+                self._armed_next_uri = None
+                self._armed_next_offset = None
+                try:
+                    await self.dlna.SetNextAVTransportURI("")
+                except Exception:
+                    logger.debug("%s gapless: clearing next URI failed", self.dlna.name)
+            return
+        offset, url = nxt
+        if url == self._armed_next_uri:
+            return
+        try:
+            await self.dlna.SetNextAVTransportURI(url)
+            self._armed_next_uri = url
+            self._armed_next_offset = offset
+            logger.debug("%s gapless armed next (offset %s): %s", self.dlna.name, offset, url)
+        except Exception:
+            logger.warning("%s gapless: SetNextAVTransportURI failed", self.dlna.name)
+
+    async def _handle_gapless_advance(self) -> None:
+        """The renderer auto-advanced to the armed next track; sync our queue."""
+        offset = self._armed_next_offset
+        self._armed_next_uri = None
+        self._armed_next_offset = None
+        if offset is None or self.queue is None:
+            return
+        try:
+            await self.queue.set_selected_offset(offset)
+            self.current_track_info = await self.queue.selected_track()
+            logger.info("%s gapless advanced to queue offset %s", self.dlna.name, offset)
+        except Exception:
+            logger.exception("%s gapless: failed to sync queue on advance", self.dlna.name)
+        await self._arm_next_track()
 
     def _reset_active_operation_tracking(self) -> None:
         if not self._active_operation_id or not self._active_target_uri:
@@ -982,6 +1077,9 @@ class PlexDlnaAdapter(object):
         }
 
     async def _issue_transport_commands(self, url: str, *, offset: int, paused: bool) -> None:
+        # An explicit SetAVTransportURI resets any pre-armed gapless "next".
+        self._armed_next_uri = None
+        self._armed_next_offset = None
         self.state.update(state="TRANSITIONING")
         self.state.check_all_next_loop = True
         if url == self.state.current_uri:
@@ -1051,6 +1149,10 @@ class PlexDlnaAdapter(object):
             # Intentional stop: clear post-operation timestamp so false-STOP
             # detection does not misinterpret the resulting STOPPED event
             self._last_operation_finish_time = None
+            # Drop any pre-armed gapless "next" so a later URI event can't be
+            # misread as an auto-advance.
+            self._armed_next_uri = None
+            self._armed_next_offset = None
         self.state.update(state="STOPPED", uri=None)
         self.current_track_info = None
         if force:

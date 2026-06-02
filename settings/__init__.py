@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     client_device_name: str | None = None
     client_model: str | None = None
     client_profile: str | None = None
+    # Gapless playback: pre-arm the next track via SetNextAVTransportURI so the
+    # renderer auto-advances at the true end (no reload gap / connect sound).
+    # Off by default; enable with env GAPLESS=1. Falls back automatically on
+    # devices that don't expose SetNextAVTransportURI.
+    gapless: bool = False
     plex_notify_interval: float = 0.5
     config_path: str = "config"
     data_file_name: str = "data.json"

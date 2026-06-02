@@ -506,6 +506,13 @@ class DlnaDevice(object):
                 return service
         return None
 
+    async def supports_action(self, action: str) -> bool:
+        """Return True if any of the device's services exposes ``action``."""
+        try:
+            return await self._find_service_by_action(action) is not None
+        except Exception:
+            return False
+
     def __getattr__(self, item):
         def action(data: dict = None, client: aiohttp.ClientSession = None):
             return self.action(item, data=data if data is not None else {}, client=client)
