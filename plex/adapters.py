@@ -813,8 +813,11 @@ class PlexDlnaAdapter(object):
                             if hasattr(self, 'current_track_info') and self.current_track_info:
                                 if not self.queue.is_track_playable(self.current_track_info):
                                     logger.warning("%s device rejected track even after transcode attempt, skipping to next", self.dlna.name)
-                                    # Cancel the active operation and skip to next track
-                                    self._active_operation_id = None
+                                    # Cancel the active operation and skip to next track.
+                                    # Use 0 (the sentinel used everywhere else), not None,
+                                    # so _finish_transport_operation's `!= operation_id`
+                                    # cleanup isn't skipped on a later int comparison.
+                                    self._active_operation_id = 0
                                     self._active_operation_event = None
                                     self._transport_state_override = None
                                     # Schedule next() to run in the event loop

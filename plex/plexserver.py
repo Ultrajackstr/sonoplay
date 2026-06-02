@@ -514,10 +514,10 @@ async def api_update_audio_settings(payload: AudioSettingsUpdate):
 async def api_create_virtual_device(payload: VirtualDeviceCreatePayload):
     try:
         summary = await create_virtual_device(payload.name.strip(), payload.member_uuids)
-        logger.info(f"Virtual device created: {summary.get('name', 'unknown')} ({summary.get('uuid', 'unknown')})")
-    except Exception as exc:  # Translate known errors
+        logger.info("Virtual device created: %s (%s)", summary.get('name', 'unknown'), summary.get('uuid', 'unknown'))
+        return summary
+    except Exception as exc:  # Translate known errors (always raises)
         _virtual_device_error_to_http(exc)
-    return summary
 
 
 @s.put("/api/virtual-devices/{virtual_uuid}")
@@ -531,9 +531,9 @@ async def api_update_virtual_device(virtual_uuid: str, payload: VirtualDeviceUpd
             name=payload.name.strip() if payload.name else None,
             member_uuids=payload.member_uuids,
         )
-    except Exception as exc:
+        return summary
+    except Exception as exc:  # Translate known errors (always raises)
         _virtual_device_error_to_http(exc)
-    return summary
 
 
 @s.delete("/api/virtual-devices/{virtual_uuid}", status_code=204)

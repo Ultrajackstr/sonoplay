@@ -4,6 +4,17 @@ Maps between unified group volume (0-100) and device-specific volume ranges.
 """
 
 
+def average_group_volume(volumes) -> int:
+    """Average member volumes for a group, returning 0 for an empty list.
+
+    Guards the group GetVolume against ZeroDivisionError when every member's
+    volume read fails (so `volumes` is empty even though members exist).
+    """
+    if not volumes:
+        return 0
+    return sum(volumes) // len(volumes)
+
+
 def map_volume_to_device(
     group_volume: int,
     device_min: int,

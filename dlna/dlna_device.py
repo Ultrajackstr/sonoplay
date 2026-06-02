@@ -32,7 +32,6 @@ from html import escape as xml_escape
 import aiohttp
 from aiohttp import ClientConnectorError, ClientConnectionError
 
-from plex.adapters import remove_adapter
 from utils import xml2dict, UPNP_RC_SERVICE_TYPE, UPNP_AVT_SERVICE_TYPE, g, extract_value
 from dlna.discover import guess_local_ip
 from transport_readiness import renderer_ready_to_play

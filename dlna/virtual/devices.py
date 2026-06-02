@@ -491,8 +491,10 @@ class VirtualDlnaDevice:
                     volumes.append(int(extract_value(getattr(info, "CurrentVolume", 0), 0)))
             except Exception:
                 continue
-        avg = sum(volumes) // len(volumes)
-        return DotMap(CurrentVolume=avg)
+        # average_group_volume returns 0 for an empty list (every member failed),
+        # avoiding a ZeroDivisionError.
+        from dlna.virtual.volume import average_group_volume
+        return DotMap(CurrentVolume=average_group_volume(volumes))
 
     async def GetMute(self, client=None):
         resolved, _ = await self._resolve_members()
