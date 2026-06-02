@@ -1,10 +1,43 @@
 import aiohttp
+import asyncio
+import logging
 import re
 import xmltodict
 from dotmap import DotMap
 
 from settings import settings
 from datetime import timedelta, datetime
+
+logger = logging.getLogger(__name__)
+
+# Strong references to fire-and-forget tasks. asyncio only keeps a weak ref to a
+# bare create_task(), so a long-running one (e.g. the SSDP discovery beacon) can
+# be garbage-collected mid-flight; we hold the ref until the task finishes.
+_background_tasks: set = set()
+
+
+def spawn_task(coro, *, name: str | None = None):
+    """Schedule a fire-and-forget coroutine safely.
+
+    Unlike a bare asyncio.create_task(coro): keeps a strong reference so the task
+    isn't GC'd before it finishes, and logs any exception instead of letting it
+    vanish (a bare task's exception is only surfaced as an "exception was never
+    retrieved" warning when it's eventually collected). Must be called from a
+    running event loop. Returns the Task.
+    """
+    task = asyncio.create_task(coro, name=name)
+    _background_tasks.add(task)
+    task.add_done_callback(_on_background_task_done)
+    return task
+
+
+def _on_background_task_done(task) -> None:
+    _background_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("background task %s failed", task.get_name(), exc_info=exc)
 
 
 UPNP_AVT_SERVICE_TYPE = "urn:schemas-upnp-org:service:AVTransport:1"

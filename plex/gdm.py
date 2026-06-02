@@ -3,6 +3,7 @@ import logging
 import socket
 
 from settings import settings
+from utils import spawn_task
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,8 @@ class PlexGDM(object):
         self.init_socket()
         if loop is None:
             loop = asyncio.get_running_loop()
-        asyncio.create_task(loop.create_datagram_endpoint(get_protocol(self), sock=self.socket))
+        spawn_task(loop.create_datagram_endpoint(get_protocol(self), sock=self.socket),
+                   name="gdm-endpoint")
 
     def stop(self):
         if self.protocol and getattr(self.protocol, "transport", None):

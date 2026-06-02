@@ -44,7 +44,7 @@ from dlna import (
 )
 from typing import List, Optional, Dict, Any
 from plex.subscribe import sub_man
-from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g, require_valid_uuid, redact_token
+from utils import plex_server_response_headers, xml2dict, timeline_poll_headers, g, require_valid_uuid, redact_token, spawn_task
 from settings import settings
 import asyncio
 from dlna.dlna_device import DlnaDevice
@@ -138,7 +138,7 @@ async def on_new_dlna_device(location_url):
         logger.warning("failed to init dlna device from %s: %s", location_url, exc)
         return
     logger.info("got new dlna device from %s", device.name)
-    asyncio.create_task(device.loop_subscribe(), name=f"dlna sub {device.name}")
+    spawn_task(device.loop_subscribe(), name=f"dlna sub {device.name}")
     devices.append(device)
     adapter = await adapter_by_device(device)
     settings.mark_device_status(device.uuid, "online")
@@ -184,7 +184,7 @@ async def guess_host_ip(request: Request):
     target_devices.extend(list_virtual_devices())
     for device in target_devices:
         adapter = await adapter_by_device(device)
-        asyncio.create_task(adapter.update_plex_tv_connection())
+        spawn_task(adapter.update_plex_tv_connection())
 
 
 async def build_response(content: str, device: DlnaDevice = None, target_uuid: str = None, status_code: int = 200,
@@ -220,7 +220,7 @@ async def on_startup():
     # to the class defaults on every restart.
     settings.load_persisted_audio_settings()
     await dlna_discover.discover()
-    asyncio.create_task(sub_man.start())
+    spawn_task(sub_man.start(), name="subscriber-manager")
     await sub_man.start_cleanup_task()
     await get_device_data()
     await load_virtual_devices()
@@ -923,7 +923,7 @@ async def timeline_poll(request: Request,
         if device is None:
             raise HTTPException(404, f"device not found {target_uuid}")
         if hasattr(device, "loop_subscribe"):
-            asyncio.create_task(device.loop_subscribe())
+            spawn_task(device.loop_subscribe())
         adapter = await adapter_by_device(device)
         if wait == 1:
             await adapter.wait_for_event(settings.plex_notify_interval * 20, interesting_fields=[
@@ -936,7 +936,7 @@ async def timeline_poll(request: Request,
         msg = msg.format(command_id=commandID)
         if datetime.now(timezone.utc) - begin_time >= timedelta(milliseconds=500):
             logger.debug("Slow poll request: %s took %s", redact_token(str(request.url)), datetime.now(timezone.utc) - begin_time)
-        asyncio.create_task(sub_man.notify_server_device(device, force=True))
+        spawn_task(sub_man.notify_server_device(device, force=True))
         return await build_response(msg, device=device, headers=timeline_poll_headers(device))
     finally:
         async with _poll_lock:

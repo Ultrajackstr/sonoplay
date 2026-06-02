@@ -32,7 +32,7 @@ from html import escape as xml_escape
 import aiohttp
 from aiohttp import ClientConnectorError, ClientConnectionError
 
-from utils import xml2dict, UPNP_RC_SERVICE_TYPE, UPNP_AVT_SERVICE_TYPE, g, extract_value
+from utils import xml2dict, UPNP_RC_SERVICE_TYPE, UPNP_AVT_SERVICE_TYPE, g, extract_value, spawn_task
 from dlna.discover import guess_local_ip
 from transport_readiness import renderer_ready_to_play
 from settings import settings
@@ -318,7 +318,7 @@ class DlnaDeviceService(object):
                 if self.device.repeat_error_count >= ERROR_COUNT_TO_REMOVE:
                     logger.warning("remove device %s due to %d connection errors", self.device.name, self.device.repeat_error_count)
                     if asyncio.get_running_loop() == self.device.loop:
-                        asyncio.create_task(self.device.remove_self())
+                        spawn_task(self.device.remove_self(), name="dlna-remove-self")
                     else:
                         asyncio.run_coroutine_threadsafe(self.device.remove_self(), self.device.loop)
                 raise

@@ -23,7 +23,7 @@ from dotmap import DotMap  # type: ignore[import]
 logger = logging.getLogger(__name__)
 
 from settings import settings
-from utils import convert_volume, extract_value
+from utils import convert_volume, extract_value, spawn_task
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from dlna.dlna_device import DlnaDevice
@@ -912,7 +912,7 @@ async def _ensure_virtual_runtime(device: VirtualDlnaDevice) -> None:
     if adapter_created:
         adapter.start_plex_tv_notify()
     if settings.host_ip not in (None, "0.0.0.0"):
-        asyncio.create_task(adapter.update_plex_tv_connection())
+        spawn_task(adapter.update_plex_tv_connection())
 
     existing_gdm = _virtual_gdm_sessions.get(device.uuid)
     if existing_gdm is not None:

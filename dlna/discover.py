@@ -6,6 +6,7 @@ import time
 logger = logging.getLogger(__name__)
 
 from settings import settings
+from utils import spawn_task
 
 SSDP_BROADCAST_PORT = 1900
 SSDP_BROADCAST_ADDR = "239.255.255.250"
@@ -59,7 +60,7 @@ def get_protocol(discover):
             self.transport = transport
             self.is_connected = True
             logger.info("dlna discover connected")
-            asyncio.create_task(self.send_loop())
+            spawn_task(self.send_loop(), name="ssdp-send-loop")
 
         async def send_loop(self):
             while self.is_connected:
@@ -82,7 +83,7 @@ def get_protocol(discover):
             location = device.get('location')
             if not location:
                 return
-            asyncio.create_task(discover.on_new_device(location))
+            spawn_task(discover.on_new_device(location), name="dlna-on-new-device")
 
         def error_received(self, exc):
             logger.error("Error received: %s", exc)

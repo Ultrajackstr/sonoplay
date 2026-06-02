@@ -5,7 +5,7 @@ from html import escape as html_escape
 logger = logging.getLogger(__name__)
 
 from plex.adapters import adapter_by_device
-from utils import subscriber_send_headers, pms_header, g
+from utils import subscriber_send_headers, pms_header, g, spawn_task
 from settings import settings
 from dlna import devices, get_device_by_uuid, list_virtual_devices
 from datetime import datetime, timedelta, timezone
@@ -225,8 +225,7 @@ class SubscribeManager(object):
                 *[self.remove_subscriber(sub.uuid, target_uuid=device.uuid) for sub in subs],
                 return_exceptions=True,
             )
-        task = asyncio.create_task(_cleanup())
-        task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
+        spawn_task(_cleanup(), name="subscriber-cleanup")
 
     async def start(self):
         await self.notify()

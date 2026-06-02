@@ -1,5 +1,6 @@
+import asyncio
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # If a prior test stubbed 'utils' as a MagicMock, remove it so we can
 # import the real package.
@@ -11,7 +12,8 @@ for _key in list(sys.modules):
         ):
             del sys.modules[_key]
 
-from utils import unescape_xml, redact_token
+import utils
+from utils import unescape_xml, redact_token, spawn_task
 
 
 def test_unescape_lt_gt():
@@ -38,6 +40,39 @@ def test_redact_token_no_token_unchanged():
 
 def test_redact_token_non_str_is_stringified():
     assert redact_token(None) == "None"
+
+
+# --- spawn_task ---------------------------------------------------------------
+
+def test_spawn_task_runs_coroutine():
+    def run():
+        ran = []
+
+        async def main():
+            async def work():
+                ran.append("ok")
+            await spawn_task(work())
+            return ran
+
+        return asyncio.run(main())
+
+    assert run() == ["ok"]
+
+
+def test_spawn_task_logs_exception_without_raising():
+    # A failing fire-and-forget task must not surface to the caller; its
+    # exception is retrieved + logged by the done-callback.
+    async def main():
+        async def boom():
+            raise ValueError("kaboom")
+        with patch.object(utils.logger, "error") as mock_err:
+            task = spawn_task(boom())
+            for _ in range(5):           # let the task run and its callback fire
+                await asyncio.sleep(0)
+            return task.done(), mock_err.called
+
+    done, logged = asyncio.run(main())
+    assert done and logged
 
 
 def test_unescape_amp():
