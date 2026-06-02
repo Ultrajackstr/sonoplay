@@ -653,9 +653,11 @@ class PlexDlnaAdapter(object):
         elapsed = self.state.elapsed if hasattr(self.state, 'elapsed') else 0
         duration = self.state.current_track_duration if hasattr(self.state, 'current_track_duration') else 0
         
-        # If elapsed is more than 5 seconds and track is substantial, this might be legitimate
-        # (though still suspicious if within protection window)
-        if elapsed > 5000 and duration > 0 and (duration - elapsed) > 5000:
+        # A false stop happens right after load, while the track has barely
+        # started. Once it has played for a while — including the natural end of
+        # the track, even shortly after a seek — a STOP is legitimate and must
+        # not be "recovered" into a replay.
+        if elapsed > 5000:
             return False
         
         logger.info("%s detected false STOP %.2fs after transport operation (elapsed=%dms, duration=%dms), triggering recovery",
@@ -730,8 +732,12 @@ class PlexDlnaAdapter(object):
             if (changed.elapsed == 0 < changed.old.elapsed <= self.current_track_info.duration
                 and self.current_track_info.duration - changed.old.elapsed <= 2000) \
                     or (
+                    # Only once the reported position has actually reached the
+                    # full duration. RelTime is 1-second resolution, so the old
+                    # floored-second comparison fired up to ~1s early and cut the
+                    # track short; rely on reset-to-0 / STOPPED for the real end.
                     changed.elapsed and changed.elapsed > changed.old.elapsed and
-                    self.current_track_info.duration // 1000 * 1000 <= changed.elapsed <= self.current_track_info.duration):
+                    changed.elapsed >= self.current_track_info.duration):
                 logger.info("auto next stopped %s, elapsed: %s -> %s, %s",
                             self.state.state, changed.old.elapsed, changed.elapsed, self.current_track_info.duration)
                 # Set no_notice and auto_next flag IMMEDIATELY (before scheduling)
