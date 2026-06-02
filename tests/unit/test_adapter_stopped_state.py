@@ -41,6 +41,14 @@ _STUB_MODULES = [
     "dlna.quirks",
 ]
 
+# Snapshot everything we are about to stub so we can restore it right after
+# importing plex.adapters. We only need the stubs to import that module in
+# isolation; leaving them in sys.modules poisons every later-collected test file
+# (which is why several siblings carry hand-rolled "purge the stub and reload
+# real" guards). Restoring the whole set keeps the real utils/settings/pydantic/
+# aiohttp/... importable afterwards, so those guards become unnecessary.
+_saved_modules = {_n: sys.modules.get(_n) for _n in _STUB_MODULES + ["plex"]}
+
 for _name in _STUB_MODULES:
     if _name not in sys.modules:
         sys.modules[_name] = _make_stub(_name)
@@ -52,28 +60,42 @@ if "plex" not in sys.modules:
     _plex_pkg.__file__ = "<stub plex>"
     sys.modules["plex"] = _plex_pkg
 
-# settings.settings must be subscribable
-sys.modules["settings"].settings = MagicMock()
+# Make the stubs functional for the import below. Only touch modules WE stubbed
+# (those absent before, i.e. _saved_modules[name] is None); if a real module was
+# already imported by an earlier test, leave it untouched -- the real one works
+# for the import and overwriting its attributes would corrupt it for other tests.
+if _saved_modules.get("settings") is None:
+    sys.modules["settings"].settings = MagicMock()  # must be subscriptable
 
-# utils helpers referenced at module level
-_utils = sys.modules["utils"]
-_utils.parse_timedelta = MagicMock(return_value=0)
-_utils.convert_volume = MagicMock(return_value=50)
-_utils.g = MagicMock()
-_utils.pms_header = MagicMock(return_value={})
-_utils.extract_value = MagicMock()
+if _saved_modules.get("utils") is None:
+    _utils = sys.modules["utils"]
+    _utils.parse_timedelta = MagicMock(return_value=0)
+    _utils.convert_volume = MagicMock(return_value=50)
+    _utils.g = MagicMock()
+    _utils.pms_header = MagicMock(return_value={})
+    _utils.extract_value = MagicMock()
 
-# PlayQueue
-sys.modules["plex.play_queue"].PlayQueue = MagicMock
+if _saved_modules.get("plex.play_queue") is None:
+    sys.modules["plex.play_queue"].PlayQueue = MagicMock
 
-# DotMap
-sys.modules["dotmap"].DotMap = MagicMock
+if _saved_modules.get("dotmap") is None:
+    sys.modules["dotmap"].DotMap = MagicMock
 
-# starlette QueryParams
-sys.modules["starlette.datastructures"].QueryParams = MagicMock
+if _saved_modules.get("starlette.datastructures") is None:
+    sys.modules["starlette.datastructures"].QueryParams = MagicMock
 
 # Now it's safe to import plex.adapters in isolation.
 from plex.adapters import PlexDlnaAdapter  # noqa: E402
+
+# Restore sys.modules so this file leaves no MagicMock stubs behind for later-
+# collected tests. plex.adapters is already imported (cached) and this file's
+# tests only exercise get_state()'s early-return paths, so it needs none of these
+# afterwards. (plex.adapters itself is intentionally left cached.)
+for _name, _mod in _saved_modules.items():
+    if _mod is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _mod
 
 
 @pytest.fixture

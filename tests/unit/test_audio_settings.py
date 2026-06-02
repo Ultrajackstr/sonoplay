@@ -14,6 +14,11 @@ _STUB_MODULES = [
     "jinja2",
 ]
 
+# Snapshot so we can restore sys.modules after importing settings.datastore;
+# otherwise these stubs (notably pydantic) leak into later-collected test files.
+_saved_modules = {_n: sys.modules.get(_n)
+                  for _n in _STUB_MODULES + ["settings", "settings.datastore"]}
+
 for _name in _STUB_MODULES:
     if _name not in sys.modules:
         mod = types.ModuleType(_name)
@@ -33,6 +38,15 @@ for _key in list(sys.modules):
             del sys.modules[_key]
 
 from settings.datastore import JSONDataStore
+
+# Restore sys.modules so this file leaves no stubs behind for later-collected
+# tests. JSONDataStore is already imported (cached) and the tests use it with an
+# in-memory fake, so nothing here is needed afterwards.
+for _name, _mod in _saved_modules.items():
+    if _mod is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _mod
 
 
 def _make_store():
