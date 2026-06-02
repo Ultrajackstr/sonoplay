@@ -537,6 +537,11 @@ class PlexDlnaAdapter(object):
         self._gapless_supported: Optional[bool] = None
         self._armed_next_uri: Optional[str] = None
         self._armed_next_offset: Optional[int] = None
+        # After a gapless cross-over the renderer can briefly report the new
+        # track carrying the previous track's position; ignore end-of-track
+        # auto-next for a short settling window so it isn't spuriously skipped.
+        self._last_gapless_advance = 0.0
+        self._gapless_settle_seconds = 5.0
 
     async def _with_no_notice(self, coro):
         """Wrap a coroutine so no_notice is True while it runs on the main loop."""
@@ -719,6 +724,12 @@ class PlexDlnaAdapter(object):
             return False
         if self.queue is None:
             return False
+        # Just after a gapless cross-over the renderer may briefly report the
+        # freshly-started track carrying the previous track's (large) position.
+        # Ignore end-of-track auto-next during that settling window so we don't
+        # spuriously skip the new track.
+        if self._last_gapless_advance and (time.monotonic() - self._last_gapless_advance) < self._gapless_settle_seconds:
+            return False
         if changed.state and changed.state != "PLAYING" and changed.old.state == "TRANSITIONING":
             return False
 
@@ -840,6 +851,7 @@ class PlexDlnaAdapter(object):
             # track's time against the new (often shorter) track.
             self.state._elapsed = 0
             self.state._current_track_duration = 0
+            self._last_gapless_advance = time.monotonic()
             asyncio.run_coroutine_threadsafe(self._handle_gapless_advance(), self.loop)
             asyncio.run_coroutine_threadsafe(self.state_changed(changed_state), self.loop)
             return

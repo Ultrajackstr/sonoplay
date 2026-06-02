@@ -9,7 +9,9 @@ auto-advance are integration behaviour, verified on the device).
 """
 
 import asyncio
+import time
 import types
+from unittest.mock import patch
 
 from plex.adapters import PlexDlnaAdapter
 
@@ -69,3 +71,66 @@ def test_shuffle_does_not_prearm():
 
 def test_no_queue_returns_none():
     assert _next(_adapter(None)) is None
+
+
+# --- auto-next "settling" guard after a gapless cross-over --------------------
+
+class _Attr(dict):
+    """Minimal DotMap stand-in: attribute access; missing key -> falsy empty."""
+
+    def __getattr__(self, key):
+        val = self.get(key)
+        return val if val is not None else _Attr()
+
+    def __bool__(self):
+        return len(self) > 0
+
+
+async def _noop():
+    return None
+
+
+def _consume(coro, *args, **kwargs):
+    if asyncio.iscoroutine(coro):
+        coro.close()
+    return None
+
+
+def _playing_adapter(duration, last_gapless_advance):
+    return types.SimpleNamespace(
+        _controlled_by_virtual_device=False,
+        _suppress_auto_next=False,
+        _auto_next_in_flight=False,
+        _active_operation_id=0,
+        queue=object(),
+        shuffle=0,
+        no_notice=False,
+        _last_gapless_advance=last_gapless_advance,
+        _gapless_settle_seconds=5.0,
+        current_track_info=types.SimpleNamespace(duration=duration),
+        state=types.SimpleNamespace(
+            current_uri="http://stream", state="PLAYING",
+            elapsed=196000, update=lambda **k: None,
+        ),
+        loop=object(),
+        _with_no_notice=lambda coro: (
+            coro.close() if asyncio.iscoroutine(coro) else None
+        ) or _noop(),
+    )
+
+
+def test_auto_next_suppressed_during_gapless_settle():
+    """A stale end-of-track position right after a gapless cross-over must not
+    trigger auto-next (the freshly-started track would be skipped)."""
+    adapter = _playing_adapter(duration=196920, last_gapless_advance=time.monotonic())
+    changed = _Attr(elapsed=196000, old=_Attr(elapsed=195000))
+    with patch("asyncio.run_coroutine_threadsafe", _consume):
+        assert PlexDlnaAdapter.check_auto_next(adapter, changed) is False
+
+
+def test_auto_next_fires_after_gapless_settle_window():
+    """Outside the settling window, genuine end-of-track auto-next still fires."""
+    adapter = _playing_adapter(duration=196920, last_gapless_advance=time.monotonic() - 100)
+    changed = _Attr(elapsed=196000, old=_Attr(elapsed=195000))
+    with patch("asyncio.run_coroutine_threadsafe", _consume):
+        assert PlexDlnaAdapter.check_auto_next(adapter, changed) is True
