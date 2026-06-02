@@ -35,6 +35,7 @@ from aiohttp import ClientConnectorError, ClientConnectionError
 from plex.adapters import remove_adapter
 from utils import xml2dict, UPNP_RC_SERVICE_TYPE, UPNP_AVT_SERVICE_TYPE, g, extract_value
 from dlna.discover import guess_local_ip
+from transport_readiness import renderer_ready_to_play
 from settings import settings
 
 PAYLOAD_FMT = '<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" ' \
@@ -536,43 +537,70 @@ class DlnaDevice(object):
     def _get_service(self, service_type: str):
         return self.services.get(service_type)
 
-    async def wait_for_can_play(self, client: aiohttp.ClientSession = None, max_wait: float = 5.0) -> bool:
+    async def wait_for_can_play(self, client: aiohttp.ClientSession = None, max_wait: float = 5.0,
+                                expected_uri: str = None) -> bool:
         """Wait until device can accept Play command.
-        
+
         Some devices need time to transition states after SetAVTransportURI
         before they'll accept a Play command. This polls GetCurrentTransportActions
         until "Play" is in the allowed actions.
-        
+
+        Renderers that AUTO-PLAY the new URI (Rygel/AMBEO, AVTransport:2) never
+        advertise "Play" once they're already playing, so the action poll alone
+        would always burn the full timeout. When `expected_uri` is supplied we
+        also treat the device as ready the moment it reports PLAYING/PAUSED that
+        exact URI -- it has cleared the transition and a Play is a no-op. The
+        URI match guards against a stale "still playing the previous track"
+        reading triggering an early Play.
+
         Source: async_upnp_client DmrDevice.async_wait_for_can_play()
-        
+
         Args:
             client: aiohttp session for DLNA requests
             max_wait: Maximum seconds to wait (default 5.0)
-            
+            expected_uri: the URI just loaded; enables the "already playing it"
+                early-out (None preserves the original Play-only behaviour)
+
         Returns:
-            True if Play is available, False if timeout
+            True if ready, False if timeout
         """
         await self.get_data()
         avt_service = self._get_service(UPNP_AVT_SERVICE_TYPE)
         if avt_service is None:
             return True  # No AVT service, assume ready
-        
+
         poll_interval = 0.25
         end_time = time.monotonic() + max_wait
-        
+
         while time.monotonic() < end_time:
             try:
+                actions = ""
                 result = await avt_service.control("GetCurrentTransportActions", {"InstanceID": 0}, client=client)
                 if result:
                     actions = getattr(result, "Actions", "") or ""
-                    if "Play" in actions:
-                        logger.debug("%s wait_for_can_play: ready", self.name)
-                        return True
+
+                transport_state = ""
+                track_uri = ""
+                # Only spend the extra round-trips on the auto-play early-out when
+                # a target URI was supplied and Play isn't already advertised.
+                if expected_uri and "Play" not in actions:
+                    info = await avt_service.control("GetTransportInfo", {"InstanceID": 0}, client=client)
+                    if info:
+                        transport_state = getattr(info, "CurrentTransportState", "") or ""
+                    if transport_state in ("PLAYING", "PAUSED_PLAYBACK"):
+                        pos = await avt_service.control("GetPositionInfo", {"InstanceID": 0}, client=client)
+                        if pos:
+                            track_uri = getattr(pos, "TrackURI", "") or ""
+
+                if renderer_ready_to_play(actions, transport_state, track_uri, expected_uri):
+                    logger.debug("%s wait_for_can_play: ready (actions=%r state=%r)",
+                                 self.name, actions, transport_state)
+                    return True
             except Exception as e:
                 logger.debug("%s wait_for_can_play error: %s", self.name, e)
-            
+
             await asyncio.sleep(poll_interval)
-        
+
         logger.debug("%s wait_for_can_play: timeout after %.1fs", self.name, max_wait)
         return False
 

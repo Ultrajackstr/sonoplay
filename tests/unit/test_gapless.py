@@ -14,6 +14,7 @@ import types
 from unittest.mock import patch
 
 from plex.adapters import PlexDlnaAdapter
+from transport_readiness import renderer_ready_to_play
 
 
 class _FakeQueue:
@@ -220,3 +221,46 @@ def test_override_pins_zero_for_pause_operation():
     # A pause load keeps the existing behaviour (0) regardless of URI.
     adapter = _override_adapter(target_uri="u://next", current_uri="u://next", paused=True)
     assert _override_time(adapter, 3000) == 0
+
+
+# --- wait_for_can_play readiness predicate ------------------------------------
+# The AMBEO auto-plays the reloaded URI, so GetCurrentTransportActions never
+# lists "Play" and wait_for_can_play burns its full 5s timeout. _ready_to_play
+# lets it return as soon as the device is confirmably playing the URI we just
+# loaded (issuing Play is then a no-op -> no UPnP 701), while still waiting
+# through the post-SetAVTransportURI transition / a stale previous-URI reading.
+
+def _ready(actions="", state="", track_uri="", expected_uri=None):
+    return renderer_ready_to_play(actions, state, track_uri, expected_uri)
+
+
+def test_ready_when_play_in_actions():
+    # Original behaviour: an idle/ready device that advertises Play.
+    assert _ready(actions="Play,Stop") is True
+
+
+def test_ready_when_already_playing_target_uri():
+    assert _ready(state="PLAYING", track_uri="u://new", expected_uri="u://new") is True
+
+
+def test_ready_when_paused_on_target_uri():
+    assert _ready(state="PAUSED_PLAYBACK", track_uri="u://new", expected_uri="u://new") is True
+
+
+def test_not_ready_while_transitioning_to_target():
+    # Still transitioning after SetAVTransportURI -> wait (preserves 701 guard).
+    assert _ready(state="TRANSITIONING", track_uri="u://new", expected_uri="u://new") is False
+
+
+def test_not_ready_when_still_playing_old_uri():
+    # Device still reports the previous track -> not on our new URI yet.
+    assert _ready(state="PLAYING", track_uri="u://old", expected_uri="u://new") is False
+
+
+def test_not_ready_playing_without_expected_uri():
+    # No target supplied -> only the Play-in-actions path can signal readiness.
+    assert _ready(state="PLAYING", track_uri="u://new", expected_uri=None) is False
+
+
+def test_not_ready_when_idle_actions_only():
+    assert _ready(actions="Stop", state="STOPPED", track_uri="", expected_uri="u://new") is False

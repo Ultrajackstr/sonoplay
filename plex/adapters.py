@@ -1132,9 +1132,11 @@ class PlexDlnaAdapter(object):
             # it. Devices like the Rygel-based AMBEO (AVTransport:2) reject Play
             # with UPnP 701 "Transition not available" when it arrives too soon
             # after SetAVTransportURI, which silently stops playback at track
-            # changes (auto-next). Falls through after a short timeout if the
-            # device doesn't support GetCurrentTransportActions.
-            await self.dlna.wait_for_can_play()
+            # changes (auto-next). Passing the target URI lets it return as soon
+            # as the device is already playing that URI (the AMBEO auto-plays and
+            # never advertises "Play"), instead of always burning the full 5s
+            # timeout. Falls through after the timeout otherwise.
+            await self.dlna.wait_for_can_play(expected_uri=url)
             await self.play()
 
     async def _await_transport_settle(self, operation_id: int) -> bool:
