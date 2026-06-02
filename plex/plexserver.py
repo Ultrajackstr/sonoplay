@@ -577,6 +577,7 @@ async def api_devices(request: Request):
                 'artist': getattr(track, 'grandparentTitle', None),
                 'album': getattr(track, 'parentTitle', None),
                 'duration': getattr(track, 'duration', None),
+                'position_ms': adapter.state.elapsed,
                 'key': getattr(track, 'key', None),
                 'ratingKey': getattr(track, 'ratingKey', None),
                 'grandparentKey': getattr(track, 'grandparentKey', None),
