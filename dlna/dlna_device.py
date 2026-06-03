@@ -168,6 +168,7 @@ class DlnaDeviceService(object):
         self.device = device
         self.subscribed = False
         self._spec_info = None
+        self._action_index = None
         self.next_subscribe_call_time = None
 
     def payload_from_template(self, action: str, data: dict):
@@ -375,10 +376,15 @@ class DlnaDeviceService(object):
         return actions
 
     async def get_action_spec(self, action_name, client: aiohttp.ClientSession = None):
-        for action in await self.get_actions(client=client):
-            if as_text(action.get('name')) == action_name:
-                return action
-        return None
+        # Memoize {action_name: action} after the first build: control() resolves
+        # an action spec on every SOAP call (~0.8s poll loop), and the SCPD never
+        # changes for a device, so an O(1) lookup replaces a linear re-scan.
+        if self._action_index is None:
+            self._action_index = {
+                as_text(action.get('name')): action
+                for action in await self.get_actions(client=client)
+            }
+        return self._action_index.get(action_name)
 
     async def get_state_variables(self):
         spec = await self.get_spec()
