@@ -200,3 +200,56 @@ function onVolumeChange(uuid, el) {
     markVolumeInteracting();
     setDeviceVolume(uuid, parseInt(el.value, 10));
 }
+
+// Toggle "mute" by setting volume to 0 and restoring the prior level on unmute.
+// (True UPnP SetMute isn't reliably settable across renderers; volume-0 is
+// guaranteed to silence via the proven setParameters path.) The button icon is
+// derived from the polled volume (0 = muted), so it also reflects a mute/volume
+// change made from the phone. Shared by the device + group cards.
+const _preMuteVolume = {};
+function toggleMute(uuid, btn) {
+    const control = btn.closest('.volume-control');
+    const slider = control ? control.querySelector('.volume-slider') : null;
+    const current = slider ? parseInt(slider.value, 10) : 0;
+    const target = current > 0 ? 0 : (_preMuteVolume[uuid] || 30);
+    if (current > 0) _preMuteVolume[uuid] = current;
+    markVolumeInteracting();              // hold off the re-render so the optimistic UI sticks
+    setDeviceVolume(uuid, target);
+    if (slider) slider.value = target;
+    const label = control ? control.querySelector('.volume-value') : null;
+    if (label) label.textContent = target;
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = target === 0 ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
+}
+
+// Seek a device/group via the Plex seekTo route (offset in ms). adapter.seek
+// updates state immediately and the timeline subscription keeps Plex in sync,
+// so a UI seek stays in sync with the device + Plexamp. Shared by both cards.
+async function seekDevice(uuid, offsetMs) {
+    try {
+        const response = await fetch(`/player/playback/seekTo?commandID=0&type=music&offset=${encodeURIComponent(offsetMs)}`, {
+            method: 'GET',
+            headers: {
+                'X-Plex-Target-Client-Identifier': uuid,
+                'X-Plex-Client-Identifier': 'sonoplay'
+            }
+        });
+        if (!response.ok) throw new Error('Seek failed');
+    } catch (error) {
+        console.error('Seek error:', error);
+    }
+}
+
+// Click-to-seek: map the click's x within the progress bar to a track position
+// and seek there, with an optimistic fill update (the poll reconciles via the
+// elapsed_jump event). A track with no/zero duration is a no-op.
+function seekToPosition(uuid, event, durationMs) {
+    if (!durationMs || durationMs <= 0) return;
+    const bar = event.currentTarget;
+    const rect = bar.getBoundingClientRect();
+    if (!rect.width) return;
+    const frac = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    seekDevice(uuid, Math.round(frac * durationMs));
+    const fill = bar.querySelector('.progress-fill');
+    if (fill) fill.style.width = `${frac * 100}%`;
+}

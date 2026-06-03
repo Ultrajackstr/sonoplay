@@ -204,7 +204,8 @@
                         <div class="now-playing-track">${escapeHtml(track.title)}</div>
                         <div class="now-playing-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
                         ${quality ? `<div class="now-playing-quality">${escapeHtml(quality)}</div>` : ''}
-                        <div class="progress-bar">
+                        <div class="progress-bar" title="Click to seek"
+                             onclick="event.stopPropagation(); seekToPosition('${safeUuid}', event, ${duration})">
                             <div class="progress-fill" style="width: ${progressPercent}%"></div>
                         </div>
                         <div class="progress-time">
@@ -223,7 +224,9 @@
                     </div>
                     ${volume != null ? `
                     <div class="volume-control" onclick="event.stopPropagation()">
-                        <i class="fas fa-volume-down"></i>
+                        <button class="volume-mute-btn" onclick="event.stopPropagation(); toggleMute('${safeUuid}', this)" aria-label="Mute / unmute" title="Mute / unmute">
+                            <i class="fas ${volume === 0 ? 'fa-volume-xmark' : 'fa-volume-high'}"></i>
+                        </button>
                         <input type="range" class="volume-slider" min="0" max="100" value="${volume}"
                                oninput="onVolumeInput(this)" onchange="onVolumeChange('${safeUuid}', this)"
                                onpointerdown="event.stopPropagation()" aria-label="Volume">
@@ -251,9 +254,8 @@
             }
 
             return `
-                <div class="device-card ${isActive ? 'playing' : ''} ${isLinked && !isActive ? 'linked' : ''}" 
-                     onclick="showDeviceDetails('${safeUuid}')">
-                    <div class="device-header">
+                <div class="device-card ${isActive ? 'playing' : ''} ${isLinked && !isActive ? 'linked' : ''}">
+                    <div class="device-header" onclick="showDeviceDetails('${safeUuid}')" title="View details">
                         <div class="device-icon">
                             <i class="fas fa-volume-up"></i>
                         </div>

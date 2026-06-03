@@ -244,3 +244,72 @@ test.describe('discovered devices — re-render skipped when unchanged', () => {
     await expect(page.locator('.device-card[data-pw-marker="1"]')).toHaveCount(1);
   });
 });
+
+test.describe('discovered devices — modal click zone (header only)', () => {
+  async function withCaps(page, dev) {
+    await mockApi(page, { devices: [dev] });
+    await page.route('**/api/devices/*/capabilities', (r) =>
+      r.fulfill({ json: { formats: [], volume: {}, gapless: false, can_seek: false } }));
+  }
+
+  test('clicking the header opens the details modal', async ({ page }) => {
+    await withCaps(page, playing());
+    await goto(page);
+    await page.locator('.device-card .device-header').click();
+    await expect(page.locator('.swal2-popup')).toBeVisible();
+  });
+
+  test('clicking the now-playing area does NOT open the modal', async ({ page }) => {
+    await withCaps(page, playing());
+    await goto(page);
+    await page.locator('.device-card .now-playing-track').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('.swal2-popup')).toHaveCount(0);
+  });
+});
+
+test.describe('discovered devices — mute button', () => {
+  test('mute (volume>0) sends setParameters volume=0 with the target header', async ({ page }) => {
+    await mockApi(page, { devices: [playing({ volume: 40 })] });
+    let req = null;
+    await page.route('**/player/playback/setParameters**', (r) => {
+      req = r.request();
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    await page.locator('.device-card .volume-mute-btn').click();
+    await expect.poll(() => req && new URL(req.url()).searchParams.get('volume')).toBe('0');
+    expect(req.headers()['x-plex-target-client-identifier']).toBe('dev-1');
+  });
+
+  test('unmute (volume==0) restores a non-zero volume', async ({ page }) => {
+    await mockApi(page, { devices: [playing({ volume: 0 })] });
+    let vol = null;
+    await page.route('**/player/playback/setParameters**', (r) => {
+      vol = new URL(r.request().url()).searchParams.get('volume');
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    await page.locator('.device-card .volume-mute-btn').click();
+    await expect.poll(() => vol !== null && parseInt(vol, 10) > 0).toBe(true);
+  });
+});
+
+test.describe('discovered devices — seekbar', () => {
+  test('clicking the progress bar seeks to that fraction of the track', async ({ page }) => {
+    await mockApi(page, { devices: [playing()] }); // duration 200000ms
+    let req = null;
+    await page.route('**/player/playback/seekTo**', (r) => {
+      req = r.request();
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    const bar = page.locator('.device-card .progress-bar');
+    const box = await bar.boundingBox();
+    await bar.click({ position: { x: box.width * 0.75, y: Math.max(1, box.height / 2) } });
+    await expect.poll(() => req && new URL(req.url()).searchParams.get('offset')).not.toBeNull();
+    const offset = parseInt(new URL(req.url()).searchParams.get('offset'), 10);
+    expect(offset).toBeGreaterThan(135000); // ~75% of 200000 = 150000, tolerance for click precision
+    expect(offset).toBeLessThan(165000);
+  });
+});
