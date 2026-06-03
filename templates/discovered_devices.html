@@ -263,7 +263,7 @@
             `;
         }).join('');
 
-        grid.innerHTML = html;
+        setGridHtml(grid, html);
     }
 
     async function sendCommand(uuid, command) {

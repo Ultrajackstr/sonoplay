@@ -368,7 +368,7 @@
 
         // Render cards
         const html = filteredGroups.map(group => createGroupCard(group)).join('');
-        grid.innerHTML = html;
+        setGridHtml(grid, html);
     }
 
     function createGroupCard(group) {

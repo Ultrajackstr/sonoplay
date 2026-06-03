@@ -96,3 +96,17 @@ async function confirmPlexPin(uuid, data, opts) {
         }
     }
 }
+
+/**
+ * Set a container's innerHTML only when it changed. Lets the 5s poll skip
+ * rebuilding the card grid -- and resetting focus/hover and the progress-bar
+ * transition -- when the rendered markup is identical to what's already shown.
+ * (Actively-playing cards still update, since their progress markup changes.)
+ * @param {HTMLElement} grid
+ * @param {string} html
+ */
+function setGridHtml(grid, html) {
+    if (!grid || html === grid._lastHtml) return;
+    grid._lastHtml = html;
+    grid.innerHTML = html;
+}

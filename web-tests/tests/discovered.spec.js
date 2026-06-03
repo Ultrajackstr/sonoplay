@@ -105,3 +105,17 @@ test.describe('discovered devices — CSS contract (for the dedup)', () => {
     expect(display).toBe('flex');
   });
 });
+
+test.describe('discovered devices — re-render skipped when unchanged', () => {
+  test('a re-poll with identical data preserves the existing card nodes', async ({ page }) => {
+    await mockApi(page, { devices: [stopped()] }); // static card: no advancing progress
+    await goto(page);
+    const card = page.locator('.device-card').first();
+    await card.waitFor();
+    // Mark the live node; if the grid is rebuilt, the marker is lost.
+    await card.evaluate((el) => el.setAttribute('data-pw-marker', '1'));
+    // A second poll with the same payload must not rebuild the grid.
+    await page.evaluate(() => window.refreshDevices());
+    await expect(page.locator('.device-card[data-pw-marker="1"]')).toHaveCount(1);
+  });
+});
