@@ -664,8 +664,8 @@ class PlexDlnaAdapter(object):
             return False
         
         # Check if track just started (elapsed is low, indicating false stop not natural end)
-        elapsed = self.state.elapsed if hasattr(self.state, 'elapsed') else 0
-        duration = self.state.current_track_duration if hasattr(self.state, 'current_track_duration') else 0
+        elapsed = self.state.elapsed
+        duration = self.state.current_track_duration
         
         # If elapsed is more than 5 seconds and track is substantial, this might be legitimate
         # (though still suspicious if within protection window)
@@ -808,7 +808,7 @@ class PlexDlnaAdapter(object):
                             # Device previously confirmed our target URI, then reverted —
                             # genuine rejection.  Check if the original track was already
                             # un-playable (high-bitrate) to decide whether to skip.
-                            if hasattr(self, 'current_track_info') and self.current_track_info:
+                            if self.current_track_info:
                                 if not self.queue.is_track_playable(self.current_track_info):
                                     logger.warning("%s device rejected track even after transcode attempt, skipping to next", self.dlna.name)
                                     # Cancel the active operation and skip to next track.

@@ -224,14 +224,7 @@ def timeline_poll_headers(device):
 def extract_value(value, default=None):
     if value is None:
         return default
-    if isinstance(value, DotMap):
-        if '@val' in value:
-            return extract_value(value['@val'], default)
-        values = list(value.values())
-        if len(values) == 1:
-            return extract_value(values[0], default)
-        return default if default is not None else value
-    if isinstance(value, dict):
+    if isinstance(value, dict):  # DotMap subclasses dict, so this covers both
         if '@val' in value:
             return extract_value(value['@val'], default)
         values = list(value.values())
