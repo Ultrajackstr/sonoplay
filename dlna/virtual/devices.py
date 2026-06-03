@@ -834,20 +834,11 @@ class VirtualDlnaDevice:
                     }
                     break
 
-        # Determine aggregate status lamp
-        available_count = sum(1 for status in overall_status if status in {"playing", "online"})
-        if available_count == len(self.member_uuids) and available_count > 0:
-            status_key = "all_available"
-            status_class = "lamp-online"
-            status_label = "Available"
-        elif available_count == 0:
-            status_key = "unavailable"
-            status_class = "lamp-offline"
-            status_label = "Unavailable"
-        else:
-            status_key = "degraded"
-            status_class = "lamp-playing"
-            status_label = "Degraded"
+        # Determine aggregate status lamp (paused members still count as reachable)
+        from dlna.virtual.group_status import aggregate_status_lamp
+        status_key, status_class, status_label = aggregate_status_lamp(
+            overall_status, len(self.member_uuids)
+        )
         
 
         token = settings.get_token_for_uuid(self.uuid)
