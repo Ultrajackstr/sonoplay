@@ -106,6 +106,27 @@ test.describe('discovered devices — CSS contract (for the dedup)', () => {
   });
 });
 
+test.describe('discovered devices — track quality line', () => {
+  test('shows codec / bitrate / sample rate / channels / Direct', async ({ page }) => {
+    await mockApi(page, { devices: [playing()] });
+    await goto(page);
+    const q = page.locator('.device-card .now-playing-quality');
+    await expect(q).toContainText('FLAC');
+    await expect(q).toContainText('1411 kbps');
+    await expect(q).toContainText('44.1 kHz');
+    await expect(q).toContainText('Stereo');
+    await expect(q).toContainText('Direct');
+  });
+
+  test('shows Transcoded when the track is being transcoded', async ({ page }) => {
+    const d = playing();
+    d.current_track = { ...d.current_track, transcode: true };
+    await mockApi(page, { devices: [d] });
+    await goto(page);
+    await expect(page.locator('.device-card .now-playing-quality')).toContainText('Transcoded');
+  });
+});
+
 test.describe('discovered devices — re-render skipped when unchanged', () => {
   test('a re-poll with identical data preserves the existing card nodes', async ({ page }) => {
     await mockApi(page, { devices: [stopped()] }); // static card: no advancing progress

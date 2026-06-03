@@ -13,6 +13,33 @@ UNLIMITED = math.inf
 MIN_QUEUE_GAP = 25
 
 
+def track_media_info(track):
+    """Extract audio-quality fields from a Plex track's first Media entry.
+
+    Returns a dict whose values are None when unavailable. The Media entry
+    describes the SOURCE file; whether SonoPlay transcodes it before sending to
+    the renderer is reported separately (see is_track_playable).
+    """
+    medias = getattr(track, 'Media', None)
+    media = medias[0] if medias else None
+    if not media:
+        return {}
+
+    def scalar(attr):
+        # Plex Media fields are scalars; coerce a DotMap "missing" (empty
+        # mapping) or empty string to None so the JSON payload stays clean.
+        v = getattr(media, attr, None)
+        return v if isinstance(v, (str, int, float)) and v != "" else None
+
+    return {
+        'container': scalar('container'),
+        'codec': scalar('audioCodec'),
+        'bitrate_kbps': scalar('bitrate'),
+        'sample_rate_hz': scalar('audioSampleRate'),
+        'channels': scalar('audioChannels'),
+    }
+
+
 class PlayQueue(object):
 
     @classmethod

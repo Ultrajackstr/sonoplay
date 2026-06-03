@@ -779,6 +779,7 @@ class VirtualDlnaDevice:
         # Check the virtual device's own adapter for current track
         if virtual_adapter.current_track_info and current_track is None:
             track = virtual_adapter.current_track_info
+            from plex.play_queue import track_media_info
             current_track = {
                 "title": getattr(track, "title", None),
                 "artist": getattr(track, "grandparentTitle", None),
@@ -790,6 +791,8 @@ class VirtualDlnaDevice:
                 "parentKey": getattr(track, "parentKey", None),
                 "grandparentRatingKey": getattr(track, "grandparentRatingKey", None),
                 "parentRatingKey": getattr(track, "parentRatingKey", None),
+                "media": track_media_info(track),
+                "transcode": (not virtual_adapter.queue.is_track_playable(track)) if virtual_adapter.queue else None,
             }
             plex_lib = virtual_adapter.plex_lib
             if plex_lib and plex_lib.protocol and plex_lib.address:

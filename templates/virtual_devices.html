@@ -426,11 +426,13 @@
             const duration = track.duration || 0;
             const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
             
+            const quality = formatTrackQuality(track.media, track.transcode);
             nowPlayingHtml = `
                 <div class="now-playing">
                     <div class="now-playing-label">Now Playing</div>
                     <div class="now-playing-track">${escapeHtml(track.title)}</div>
                     <div class="now-playing-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+                    ${quality ? `<div class="now-playing-quality">${escapeHtml(quality)}</div>` : ''}
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: ${progressPercent}%"></div>
                     </div>

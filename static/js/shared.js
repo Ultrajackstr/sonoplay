@@ -110,3 +110,27 @@ function setGridHtml(grid, html) {
     grid._lastHtml = html;
     grid.innerHTML = html;
 }
+
+/**
+ * Build a one-line audio-quality summary from a track's media info, e.g.
+ * "FLAC · 1411 kbps · 44.1 kHz · Stereo · Direct". Returns '' when no info.
+ * @param {object} media - {container, codec, bitrate_kbps, sample_rate_hz, channels}
+ * @param {boolean|null} transcode - true = transcoded, false = direct, null = unknown
+ */
+function formatTrackQuality(media, transcode) {
+    media = media || {};
+    const parts = [];
+    const fmt = media.container || media.codec;
+    if (fmt) parts.push(String(fmt).toUpperCase());
+    if (media.bitrate_kbps) parts.push(`${media.bitrate_kbps} kbps`);
+    if (media.sample_rate_hz) {
+        const khz = media.sample_rate_hz / 1000;
+        parts.push(`${Number.isInteger(khz) ? khz : khz.toFixed(1)} kHz`);
+    }
+    if (media.channels === 1) parts.push('Mono');
+    else if (media.channels === 2) parts.push('Stereo');
+    else if (media.channels) parts.push(`${media.channels}ch`);
+    if (transcode === true) parts.push('Transcoded');
+    else if (transcode === false) parts.push('Direct');
+    return parts.join(' · ');
+}

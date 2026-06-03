@@ -517,6 +517,13 @@ body {
     text-overflow: ellipsis;
 }
 
+.now-playing-quality {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.02em;
+}
+
 .progress-bar {
     margin-top: var(--space-md);
     height: 4px;

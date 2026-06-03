@@ -49,6 +49,7 @@ from settings import settings
 import asyncio
 from dlna.dlna_device import DlnaDevice
 from plex.adapters import adapter_by_device
+from plex.play_queue import track_media_info
 from plex.gdm import PlexGDM
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -596,8 +597,10 @@ async def api_devices(request: Request):
                 'parentKey': getattr(track, 'parentKey', None),
                 'grandparentRatingKey': getattr(track, 'grandparentRatingKey', None),
                 'parentRatingKey': getattr(track, 'parentRatingKey', None),
+                'media': track_media_info(track),
+                'transcode': (not adapter.queue.is_track_playable(track)) if adapter.queue else None,
             }
-            
+
             # Collect all available artwork URLs
             plex_lib = adapter.plex_lib
             if plex_lib and plex_lib.protocol and plex_lib.address:

@@ -17,7 +17,11 @@ function device(over = {}) {
     model: 'TestModel',
     binded: true,
     status: 'playing',
-    current_track: { title: 'Song A', artist: 'Artist A', duration: 200000, position_ms: 50000 },
+    current_track: {
+      title: 'Song A', artist: 'Artist A', duration: 200000, position_ms: 50000,
+      media: { container: 'flac', codec: 'flac', bitrate_kbps: 1411, sample_rate_hz: 44100, channels: 2 },
+      transcode: false,
+    },
     artwork_urls: [],
     play_count: 1,
     play_duration_ms: 1000,
