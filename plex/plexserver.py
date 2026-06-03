@@ -645,6 +645,32 @@ async def api_devices(request: Request):
     }
 
 
+@s.get("/api/devices/{uuid}/capabilities")
+async def api_device_capabilities(uuid: str):
+    """Renderer capabilities for the device detail view: the content types it
+    accepts (DLNA GetProtocolInfo), its volume range, and transport features.
+    Fetched on demand (not on the poll path) since it issues a SOAP call.
+    Note: DLNA does not expose a max-bitrate; only supported formats/profiles."""
+    require_valid_uuid(uuid)
+    device = await get_device_by_uuid(uuid)
+    if device is None:
+        raise HTTPException(404, f"device not found {uuid}")
+    formats = await device.supported_formats() if hasattr(device, "supported_formats") else []
+    can = device.supports_action if hasattr(device, "supports_action") else None
+    return {
+        "manufacturer": getattr(device, "manufacturer", None),
+        "model": getattr(device, "model", None),
+        "formats": formats,
+        "volume": {
+            "min": getattr(device, "volume_min", None),
+            "max": getattr(device, "volume_max", None),
+            "step": getattr(device, "volume_step", None),
+        },
+        "gapless": (await can("SetNextAVTransportURI")) if can else False,
+        "can_seek": (await can("Seek")) if can else False,
+    }
+
+
 @s.post("/")
 async def link_device(request: Request,
                       name: str = Form(default=None),

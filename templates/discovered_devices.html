@@ -272,14 +272,22 @@
         return sendPlaybackCommand(uuid, command, refreshDevices);
     }
 
-    function showDeviceDetails(uuid) {
+    async function showDeviceDetails(uuid) {
         const device = lastFetchedDevices.find(d => d.uuid === uuid);
         if (!device) return;
-        
+
         const safeName = escapeHtml(device.name || 'Unknown Device');
         const safeIp = escapeHtml(device.ip || 'Unknown');
         const safeModel = escapeHtml(device.model || device.manufacturer || 'Unknown');
-        
+
+        // Capabilities are best-effort: they issue a DLNA SOAP call, so fetch
+        // them on demand here rather than on the poll path.
+        let caps = null;
+        try {
+            const res = await fetch(`/api/devices/${encodeURIComponent(uuid)}/capabilities`);
+            if (res.ok) caps = await res.json();
+        } catch (e) { /* leave caps null; the modal still shows the basics */ }
+
         Swal.fire({
             title: safeName,
             html: `
@@ -288,6 +296,7 @@
                     <p><strong>Model:</strong> ${safeModel}</p>
                     <p><strong>Status:</strong> ${device.status || 'Unknown'}</p>
                     <p><strong>Linked:</strong> ${device.binded ? 'Yes' : 'No'}</p>
+                    ${formatDeviceCapabilities(caps)}
                 </div>
             `,
             showCancelButton: true,

@@ -113,6 +113,11 @@ def test_link_flows_delegate_to_shared_confirm_helper():
         )
 
 
+def test_device_capabilities_route_exists():
+    """The device-details modal fetches /api/devices/{uuid}/capabilities."""
+    assert "/api/devices/{uuid}/capabilities" in _all_registered_routes()
+
+
 def test_nav_plex_widget_endpoints_exist():
     """base.html's Plex nav widget calls /api/plex-status (checkPlexStatus) and
     /api/plex-disconnect (disconnectPlex); both must be registered routes."""

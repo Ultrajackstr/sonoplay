@@ -127,6 +127,24 @@ test.describe('discovered devices — track quality line', () => {
   });
 });
 
+test.describe('discovered devices — device capabilities modal', () => {
+  test('opening details shows formats, volume range and features', async ({ page }) => {
+    await mockApi(page, { devices: [playing()] });
+    await page.route('**/api/devices/*/capabilities', (r) => r.fulfill({ json: {
+      manufacturer: 'Sennheiser', model: 'AMBEO',
+      formats: ['audio/flac', 'audio/mpeg', 'audio/L16'],
+      volume: { min: 0, max: 100, step: 1 },
+      gapless: true, can_seek: true,
+    } }));
+    await goto(page);
+    await page.locator('.device-card .device-name').click(); // bubbles to showDeviceDetails
+    const body = page.locator('.swal2-html-container');
+    await expect(body).toContainText('audio/flac');
+    await expect(body).toContainText('Volume range');
+    await expect(body).toContainText('Gapless');
+  });
+});
+
 test.describe('discovered devices — re-render skipped when unchanged', () => {
   test('a re-poll with identical data preserves the existing card nodes', async ({ page }) => {
     await mockApi(page, { devices: [stopped()] }); // static card: no advancing progress

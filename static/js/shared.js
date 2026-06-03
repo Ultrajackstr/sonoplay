@@ -134,3 +134,26 @@ function formatTrackQuality(media, transcode) {
     else if (transcode === false) parts.push('Direct');
     return parts.join(' · ');
 }
+
+/**
+ * Build the HTML capabilities block for the device-details modal from the
+ * /api/devices/{uuid}/capabilities payload. Returns '' when nothing useful.
+ * @param {object} caps - {formats, volume:{min,max,step}, gapless, can_seek}
+ */
+function formatDeviceCapabilities(caps) {
+    if (!caps) return '';
+    const rows = [];
+    if (Array.isArray(caps.formats) && caps.formats.length) {
+        rows.push(`<p><strong>Plays:</strong> ${caps.formats.map(escapeHtml).join(', ')}</p>`);
+    }
+    const v = caps.volume || {};
+    if (v.max != null) {
+        const step = (v.step != null && v.step !== 1) ? ` (step ${escapeHtml(String(v.step))})` : '';
+        rows.push(`<p><strong>Volume range:</strong> ${escapeHtml(String(v.min))}–${escapeHtml(String(v.max))}${step}</p>`);
+    }
+    const features = [];
+    if (caps.gapless) features.push('Gapless');
+    if (caps.can_seek) features.push('Seek');
+    if (features.length) rows.push(`<p><strong>Supports:</strong> ${features.join(', ')}</p>`);
+    return rows.join('');
+}

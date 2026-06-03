@@ -394,6 +394,25 @@ class DlnaDeviceService(object):
         return vars
 
 
+def parse_sink_formats(sink):
+    """Parse a DLNA ConnectionManager Sink string into a sorted list of unique
+    content types the renderer accepts.
+
+    Sink is a CSV of `protocol:network:contentFormat:additionalInfo` entries,
+    e.g. "http-get:*:audio/flac:*,http-get:*:audio/mpeg:DLNA.ORG_PN=MP3".
+    """
+    if not sink:
+        return []
+    formats = set()
+    for entry in str(sink).split(','):
+        fields = entry.split(':')
+        if len(fields) >= 3:
+            content = fields[2].strip().split(';')[0].strip()
+            if content and content != '*' and '/' in content:
+                formats.add(content)
+    return sorted(formats)
+
+
 class DlnaDevice(object):
 
     def __init__(self, location_url):
@@ -407,6 +426,7 @@ class DlnaDevice(object):
         self.volume_max = None
         self.volume_min = None
         self.volume_step = None
+        self._supported_formats = None
         self.uuid = None
         self.loop = asyncio.get_running_loop()
         self.repeat_error_count = 0
@@ -501,6 +521,23 @@ class DlnaDevice(object):
             # disables features like gapless for the device.
             logger.debug("%s supports_action(%s) failed: %s", self.name, action, e)
             return False
+
+    async def supported_formats(self):
+        """Content types this renderer accepts, from ConnectionManager
+        GetProtocolInfo (Sink), cached on success. Returns [] if unavailable."""
+        if self._supported_formats is not None:
+            return self._supported_formats
+        formats = []
+        try:
+            await self.get_data()
+            resp = await self.GetProtocolInfo()
+            if resp is not None:
+                formats = parse_sink_formats(as_text(resp.get('Sink')))
+        except Exception as e:
+            logger.debug("%s GetProtocolInfo failed: %s", self.name, e)
+        if formats:
+            self._supported_formats = formats
+        return formats
 
     def __getattr__(self, item):
         def action(data: dict = None, client: aiohttp.ClientSession = None):
