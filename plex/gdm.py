@@ -62,7 +62,7 @@ class PlexGDM(object):
             "Name": self.device.name,
             "Port": str(self.server_port),
             "Content-Type": "plex/media-player",
-            "Product": self.device.model,
+            "Product": settings.product,
             "Protocol": "plex",
             "Protocol-Version": "1",
             "Protocol-Capabilities": "timeline,playback,playqueues",

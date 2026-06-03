@@ -21,3 +21,14 @@ def test_parses_dedupes_sorts_and_strips_params():
 
 def test_ignores_malformed_entries():
     assert parse_sink_formats("garbage,http-get:*:audio/flac:*") == ["audio/flac"]
+
+
+def test_filters_out_non_audio_types():
+    sink = (
+        "http-get:*:audio/flac:*,"
+        "http-get:*:application/ogg:*,"
+        "http-get:*:text/xml:*,"            # metadata -> dropped
+        "http-get:*:video/x-mpegurl:*,"     # M3U playlist -> dropped
+        "http-get:*:video/mpegurl:*"        # M3U playlist -> dropped
+    )
+    assert parse_sink_formats(sink) == ["application/ogg", "audio/flac"]

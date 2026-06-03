@@ -1009,7 +1009,7 @@ async def resources(request: Request, target_uuid: str = Header(None, alias="x-p
     res = "<MediaContainer>"
     res += f'<Player title="{xml_escape(str(device.name), quote=True)}" protocol="plex" protocolVersion="1" ' \
            f'protocolCapabilities="timeline,playback,playqueues" ' \
-           f'machineIdentifier="{device.uuid}" product="{device.model}" ' \
+           f'machineIdentifier="{device.uuid}" product="{settings.product}" ' \
            f'platform="{settings.platform}" ' \
            f'platformVersion="{settings.platform_version}" ' \
            f'version="{settings.version}" deviceClass="stb"/>'

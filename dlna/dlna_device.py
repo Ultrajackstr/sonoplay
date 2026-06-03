@@ -409,10 +409,12 @@ class DlnaDeviceService(object):
 
 def parse_sink_formats(sink):
     """Parse a DLNA ConnectionManager Sink string into a sorted list of unique
-    content types the renderer accepts.
+    AUDIO content types the renderer accepts.
 
     Sink is a CSV of `protocol:network:contentFormat:additionalInfo` entries,
-    e.g. "http-get:*:audio/flac:*,http-get:*:audio/mpeg:DLNA.ORG_PN=MP3".
+    e.g. "http-get:*:audio/flac:*,http-get:*:audio/mpeg:DLNA.ORG_PN=MP3". Only
+    audio/* (plus application/ogg) are kept -- devices also advertise playlist
+    and metadata types (text/xml, video/x-mpegurl, ...) that aren't useful here.
     """
     if not sink:
         return []
@@ -421,7 +423,7 @@ def parse_sink_formats(sink):
         fields = entry.split(':')
         if len(fields) >= 3:
             content = fields[2].strip().split(';')[0].strip()
-            if content and content != '*' and '/' in content:
+            if content.startswith('audio/') or content == 'application/ogg':
                 formats.add(content)
     return sorted(formats)
 
