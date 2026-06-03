@@ -12,61 +12,19 @@
 """
 DataStore abstraction layer for future database migration.
 Currently backed by JSON files, but can be swapped for SQLAlchemy/ORM later.
+
+Only meta-scoped settings (onboarding, audio, device-uuid listing) live here;
+per-device stats/token/alias persistence is handled directly on the Settings
+object (the previous duplicate DataStore methods were never wired in).
 """
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Callable
 from copy import deepcopy
 
 
 class DataStore(ABC):
     """Abstract interface for data persistence operations."""
-    
-    @abstractmethod
-    def get_device_stats(self, uuid: str) -> Dict[str, Any]:
-        """Get statistics for a device by UUID."""
-        pass
-    
-    @abstractmethod
-    def save_device_stats(self, uuid: str, stats: Dict[str, Any]) -> None:
-        """Save statistics for a device."""
-        pass
-    
-    @abstractmethod
-    def increment_play_count(self, uuid: str) -> None:
-        """Increment play count for a device."""
-        pass
-    
-    @abstractmethod
-    def add_play_duration_ms(self, uuid: str, duration_ms: int) -> None:
-        """Add to total play duration for a device."""
-        pass
-    
-    @abstractmethod
-    def mark_device_status(self, uuid: str, status: str) -> None:
-        """Update device status (online/offline/playing)."""
-        pass
-    
-    @abstractmethod
-    def get_token_for_uuid(self, uuid: str) -> Optional[str]:
-        """Get Plex token for a device."""
-        pass
-    
-    @abstractmethod
-    def set_token_for_uuid(self, uuid: str, token: str) -> None:
-        """Set Plex token for a device."""
-        pass
-    
-    @abstractmethod
-    def get_dlna_name_alias(self, uuid: str) -> Optional[str]:
-        """Get custom name alias for a device."""
-        pass
-    
-    @abstractmethod
-    def save_dlna_name_alias(self, uuid: str, name: str) -> None:
-        """Save custom name alias for a device."""
-        pass
-    
+
     @abstractmethod
     def get_all_device_uuids(self) -> list[str]:
         """Get list of all known device UUIDs."""
@@ -116,7 +74,7 @@ DEFAULT_ONBOARDING_STATE = {
 
 class JSONDataStore(DataStore):
     """JSON file-based implementation of DataStore."""
-    
+
     def __init__(self, settings_instance):
         """Initialize with reference to existing Settings instance."""
         self._settings = settings_instance
@@ -126,13 +84,6 @@ class JSONDataStore(DataStore):
     def _load_data(self) -> Dict[str, Any]:
         return dict(self._settings.load_data())
 
-    def _mutate_entry(self, uuid: str, mutator: Callable[[Dict[str, Any]], None]) -> None:
-        data = self._load_data()
-        entry = dict(data.get(uuid, {}))
-        mutator(entry)
-        data[uuid] = entry
-        self._settings.save_data(data)
-
     def _mutate_meta(self, mutator: Callable[[Dict[str, Any]], None]) -> None:
         data = self._load_data()
         meta = dict(data.get(self._META_KEY, {}))
@@ -140,75 +91,6 @@ class JSONDataStore(DataStore):
         data[self._META_KEY] = meta
         self._settings.save_data(data)
 
-    def get_device_stats(self, uuid: str) -> Dict[str, Any]:
-        """Get statistics for a device by UUID."""
-        data = self._load_data()
-        stats = dict(data.get(uuid, {}).get('stats', {}))
-        return {
-            'play_count': stats.get('play_count', 0),
-            'play_duration_ms': stats.get('play_duration_ms', 0),
-            'status': stats.get('status', 'offline'),
-            'last_seen': stats.get('last_seen', None)
-        }
-
-    def save_device_stats(self, uuid: str, stats: Dict[str, Any]) -> None:
-        """Save statistics for a device."""
-
-        def mutator(entry: Dict[str, Any]) -> None:
-            entry['stats'] = dict(stats)
-
-        self._mutate_entry(uuid, mutator)
-
-    @staticmethod
-    def _stamp_last_seen(stats: Dict[str, Any]) -> None:
-        stats['last_seen'] = datetime.now(timezone.utc).isoformat()
-
-    def increment_play_count(self, uuid: str) -> None:
-        """Increment play count for a device."""
-        stats = self.get_device_stats(uuid)
-        stats['play_count'] = stats.get('play_count', 0) + 1
-        stats['status'] = 'playing'
-        self._stamp_last_seen(stats)
-        self.save_device_stats(uuid, stats)
-    
-    def add_play_duration_ms(self, uuid: str, duration_ms: int) -> None:
-        """Add to total play duration for a device."""
-        stats = self.get_device_stats(uuid)
-        stats['play_duration_ms'] = stats.get('play_duration_ms', 0) + duration_ms
-        self._stamp_last_seen(stats)
-        self.save_device_stats(uuid, stats)
-    
-    def mark_device_status(self, uuid: str, status: str) -> None:
-        """Update device status (online/offline/playing)."""
-        stats = self.get_device_stats(uuid)
-        stats['status'] = status
-        self._stamp_last_seen(stats)
-        self.save_device_stats(uuid, stats)
-    
-    def get_token_for_uuid(self, uuid: str) -> Optional[str]:
-        """Get Plex token for a device."""
-        data = self._load_data()
-        return data.get(uuid, {}).get('token')
-    
-    def set_token_for_uuid(self, uuid: str, token: str) -> None:
-        """Set Plex token for a device."""
-        def mutator(entry: Dict[str, Any]) -> None:
-            entry['token'] = token
-
-        self._mutate_entry(uuid, mutator)
-    
-    def get_dlna_name_alias(self, uuid: str) -> Optional[str]:
-        """Get custom name alias for a device."""
-        data = self._load_data()
-        return data.get(uuid, {}).get('alias')
-    
-    def save_dlna_name_alias(self, uuid: str, name: str) -> None:
-        """Save custom name alias for a device."""
-        def mutator(entry: Dict[str, Any]) -> None:
-            entry['alias'] = name
-
-        self._mutate_entry(uuid, mutator)
-    
     def get_all_device_uuids(self) -> list[str]:
         """Get list of all known device UUIDs."""
         data = self._load_data()
