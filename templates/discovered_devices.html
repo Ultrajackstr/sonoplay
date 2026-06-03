@@ -293,6 +293,10 @@
         const html = devices.map(device => {
             const isOnline = device.status === 'online' || device.status === 'playing';
             const isPlaying = device.status === 'playing';
+            // A loaded track that isn't playing means the device is paused:
+            // the backend keeps current_track on pause and clears it on stop.
+            const isPaused = !isPlaying && !!(device.current_track && device.current_track.title);
+            const isActive = isPlaying || isPaused;
             const isLinked = device.binded;
             
             // Status
@@ -301,6 +305,9 @@
             if (isPlaying) {
                 statusClass = 'playing';
                 statusText = 'Now Playing';
+            } else if (isPaused) {
+                statusClass = 'playing';
+                statusText = 'Paused';
             } else if (isLinked) {
                 statusClass = 'linked';
                 statusText = 'Linked';
@@ -317,7 +324,10 @@
             // Now Playing section
             let nowPlayingHtml = '';
             const track = device.current_track || {};
-            if (isPlaying && track.title) {
+            const mainBtn = isPlaying
+                ? `<button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause"><i class="fas fa-pause"></i></button>`
+                : `<button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'play')" aria-label="Play"><i class="fas fa-play"></i></button>`;
+            if (isActive && track.title) {
                 const progress = track.position_ms || 0;
                 const duration = track.duration || 0;
                 const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
@@ -339,9 +349,7 @@
                         <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')" aria-label="Previous track">
                             <i class="fas fa-step-backward"></i>
                         </button>
-                        <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause">
-                            <i class="fas fa-pause"></i>
-                        </button>
+                        ${mainBtn}
                         <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')" aria-label="Next track">
                             <i class="fas fa-step-forward"></i>
                         </button>
@@ -358,7 +366,7 @@
                         Link
                     </button>
                 `;
-            } else if (!isPlaying) {
+            } else if (!isActive) {
                 actionButton = `
                     <button class="control-btn" onclick="event.stopPropagation(); relinkDevice('${safeUuid}')">
                         <i class="fas fa-sync"></i>
@@ -368,7 +376,7 @@
             }
 
             return `
-                <div class="device-card ${isPlaying ? 'playing' : ''} ${isLinked && !isPlaying ? 'linked' : ''}" 
+                <div class="device-card ${isActive ? 'playing' : ''} ${isLinked && !isActive ? 'linked' : ''}" 
                      onclick="showDeviceDetails('${safeUuid}')">
                     <div class="device-header">
                         <div class="device-icon">
@@ -398,7 +406,7 @@
     }
 
     async function sendCommand(uuid, command) {
-        const endpoints = { previous: 'skipPrevious', pause: 'pause', next: 'skipNext' };
+        const endpoints = { previous: 'skipPrevious', pause: 'pause', play: 'play', next: 'skipNext' };
         const endpoint = endpoints[command] || command;
         try {
             const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {

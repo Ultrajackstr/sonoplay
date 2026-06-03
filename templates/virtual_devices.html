@@ -395,6 +395,10 @@
         const members = group.members || [];
         const onlineCount = members.filter(m => m.status === 'online' || m.status === 'playing').length;
         const isPlaying = group.status === 'playing' || members.some(m => m.status === 'playing');
+        // Members report an explicit 'paused' status; treat a paused-but-not-playing
+        // group as active so the now-playing card and controls stay visible.
+        const isPaused = !isPlaying && members.some(m => m.status === 'paused');
+        const isActive = isPlaying || isPaused;
         const isLinked = group.binded;
         
         // Status class
@@ -434,7 +438,10 @@
         // Now Playing section
         let nowPlayingHtml = '';
         const track = group.current_track || {};
-        if (isPlaying && track.title) {
+        const mainBtn = isPlaying
+            ? `<button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause"><i class="fas fa-pause"></i></button>`
+            : `<button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'play')" aria-label="Play"><i class="fas fa-play"></i></button>`;
+        if (isActive && track.title) {
             const progress = group.current_session_ms || 0;
             const duration = track.duration || 0;
             const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
@@ -456,9 +463,7 @@
                     <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'previous')" aria-label="Previous track">
                         <i class="fas fa-step-backward"></i>
                     </button>
-                    <button class="playback-btn main" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'pause')" aria-label="Pause">
-                        <i class="fas fa-pause"></i>
-                    </button>
+                    ${mainBtn}
                     <button class="playback-btn" onclick="event.stopPropagation(); sendCommand('${safeUuid}', 'next')" aria-label="Next track">
                         <i class="fas fa-step-forward"></i>
                     </button>
@@ -475,7 +480,7 @@
                     Link
                 </button>
             `;
-        } else if (!isPlaying) {
+        } else if (!isActive) {
             actionButton = `
                 <button class="control-btn" onclick="event.stopPropagation(); relinkGroup('${safeUuid}')">
                     <i class="fas fa-sync"></i>
@@ -485,7 +490,7 @@
         }
 
         return `
-            <div class="device-card ${isPlaying ? 'playing' : ''} ${isLinked && !isPlaying ? 'linked' : ''}" 
+            <div class="device-card ${isActive ? 'playing' : ''} ${isLinked && !isActive ? 'linked' : ''}"
                  onclick="showGroupDetails('${safeUuid}')">
                 <div class="device-header">
                     <div class="device-icon">
@@ -518,7 +523,7 @@
 
     // Playback Commands
     async function sendCommand(uuid, command) {
-        const endpoints = { previous: 'skipPrevious', pause: 'pause', next: 'skipNext' };
+        const endpoints = { previous: 'skipPrevious', pause: 'pause', play: 'play', next: 'skipNext' };
         const endpoint = endpoints[command] || command;
         try {
             const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {

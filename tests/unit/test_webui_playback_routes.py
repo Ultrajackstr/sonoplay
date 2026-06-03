@@ -75,3 +75,15 @@ def test_templates_call_registered_playback_routes():
             assert f"/player/playback/{ep}" in routes, (
                 f"{label}: sendCommand maps to /player/playback/{ep} which is not a registered route"
             )
+
+
+def test_templates_wire_both_play_and_pause():
+    """The main transport button must offer BOTH pause (while playing) and play
+    (to resume while paused). Without a wired 'play' command a paused device
+    cannot be resumed from the UI -- the original bug report."""
+    for label, path in TEMPLATES.items():
+        text = path.read_text(encoding="utf-8")
+        assert ", 'pause')" in text, f"{label}: no pause command wired"
+        assert ", 'play')" in text, (
+            f"{label}: no play command wired -- a paused device can't be resumed from the UI"
+        )
