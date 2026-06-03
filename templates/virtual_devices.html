@@ -300,9 +300,9 @@
     let editingUuid = null;
 
     // API Functions
-    async function fetchGroups() {
+    async function fetchGroups(wait = false) {
         try {
-            const response = await fetch('/api/virtual-devices');
+            const response = await fetch(`/api/virtual-devices${wait ? '?wait=1' : ''}`);
             if (!response.ok) throw new Error('Failed to load groups');
             const data = await response.json();
             virtualDevices = data.virtual_devices || [];
@@ -321,6 +321,9 @@
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
         
         if (!grid) return;
+        // Don't rebuild while a volume slider is being dragged (it would recreate
+        // the <input> mid-drag); the poll resumes shortly after interaction ends.
+        if (isVolumeInteracting()) return;
 
         // Update count
         if (countEl) {
@@ -427,6 +430,7 @@
             const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
             
             const quality = formatTrackQuality(track.media, track.transcode);
+            const volume = group.volume;
             nowPlayingHtml = `
                 <div class="now-playing">
                     <div class="now-playing-label">Now Playing</div>
@@ -450,6 +454,14 @@
                         <i class="fas fa-step-forward"></i>
                     </button>
                 </div>
+                ${volume != null ? `
+                <div class="volume-control" onclick="event.stopPropagation()">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" class="volume-slider" min="0" max="100" value="${volume}"
+                           oninput="onVolumeInput(this)" onchange="onVolumeChange('${safeUuid}', this)"
+                           onpointerdown="event.stopPropagation()" aria-label="Volume">
+                    <span class="volume-value">${volume}</span>
+                </div>` : ''}
             `;
         }
         
@@ -505,7 +517,34 @@
 
     // Playback Commands
     async function sendCommand(uuid, command) {
-        return sendPlaybackCommand(uuid, command, fetchGroups);
+        return sendPlaybackCommand(uuid, command, () => refreshUntilGroupChanges(uuid));
+    }
+
+    // After a transport command the group's new play state isn't visible until
+    // the backend's check loop sees it on the members, and the idle long-poll
+    // can take ~5s. So fast-poll (no-wait) until this group's play state / track
+    // changes, instead of waiting out the long-poll (same fix as the Devices
+    // page). Bounded; a newer command supersedes an in-flight burst.
+    let groupBurstGen = 0;
+    function groupSignature(uuid) {
+        const g = virtualDevices.find((x) => x.uuid === uuid);
+        if (!g) return '';
+        const members = g.members || [];
+        const playing = members.some((m) => m.status === 'playing');
+        const paused = !playing && members.some((m) => m.status === 'paused');
+        const t = g.current_track || {};
+        return `${playing}|${paused}|${t.title || ''}|${t.key || ''}`;
+    }
+    async function refreshUntilGroupChanges(uuid) {
+        const myGen = ++groupBurstGen;
+        const before = groupSignature(uuid);
+        const delays = [150, 250, 350, 500, 700, 900]; // ~2.85s, snappy early
+        for (const ms of delays) {
+            await sleep(ms);
+            if (myGen !== groupBurstGen) return;       // a newer command took over
+            await fetchGroups();                       // no-wait: reads real state
+            if (groupSignature(uuid) !== before) return;
+        }
     }
 
     // Link/Relink
@@ -849,13 +888,27 @@
         renderGroupGrid();
     });
 
-    // Initial load and polling
+    // Initial load + reactive polling. /api/virtual-devices?wait=1 long-polls
+    // server-side (returns the moment any member's state/volume/track changes,
+    // else after a few seconds), so the Groups page tracks phone/remote changes
+    // almost immediately. The loop pauses while the tab is hidden and backs off
+    // on error -- same shape as the Devices page poll loop.
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function groupPollLoop() {
+        await fetchGroups();             // fast first paint (no wait)
+        while (true) {
+            if (document.hidden) { await sleep(1000); continue; }
+            try {
+                await fetchGroups(true); // long-poll
+            } catch (e) {
+                await sleep(3000);       // back off on error
+            }
+            await sleep(200);            // floor: avoid a hot loop on instant returns
+        }
+    }
     document.addEventListener('DOMContentLoaded', () => {
-        fetchGroups();
-        // Poll every 5 seconds, but skip while the tab is hidden -- background
-        // tabs were otherwise hammering /api/virtual-devices, which fans out.
-        setInterval(() => { if (!document.hidden) fetchGroups(); }, 5000);
-        // Refresh immediately when the tab becomes visible again.
+        groupPollLoop();
+        // Snappy refresh when returning to the tab (don't wait out a long-poll).
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) fetchGroups();
         });

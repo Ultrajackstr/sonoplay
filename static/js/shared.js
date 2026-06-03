@@ -176,3 +176,27 @@ async function setDeviceVolume(uuid, volume) {
         console.error('Volume error:', error);
     }
 }
+
+// Volume-slider interaction state, shared by the device + group grids. While
+// the user drags a slider we suppress the grid re-render (it would recreate the
+// <input> mid-drag and interrupt the drag); the flag clears ~1.5s after the
+// last interaction, by which point the poll has reconciled the real volume so
+// the next render shows the settled value. The render loops gate on
+// isVolumeInteracting() rather than a bare cross-script variable.
+let _volumeInteracting = false;
+let _volumeInteractTimer = null;
+function isVolumeInteracting() { return _volumeInteracting; }
+function markVolumeInteracting() {
+    _volumeInteracting = true;
+    clearTimeout(_volumeInteractTimer);
+    _volumeInteractTimer = setTimeout(() => { _volumeInteracting = false; }, 1500);
+}
+function onVolumeInput(el) {
+    markVolumeInteracting();
+    const label = el.parentElement.querySelector('.volume-value');
+    if (label) label.textContent = el.value;
+}
+function onVolumeChange(uuid, el) {
+    markVolumeInteracting();
+    setDeviceVolume(uuid, parseInt(el.value, 10));
+}

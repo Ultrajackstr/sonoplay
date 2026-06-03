@@ -723,6 +723,7 @@ class VirtualDlnaDevice:
                         "ip": device.ip,
                         "status": status,
                         "available": available,
+                        "volume": getattr(adapter.state, "volume", None),
                         "play_count": stats.get("play_count", 0),
                         "play_duration_ms": stats.get("play_duration_ms", 0),
                         "current_session_ms": stats.get("current_session_ms", 0),
@@ -742,6 +743,7 @@ class VirtualDlnaDevice:
                         "ip": snapshot.get("ip"),
                         "status": "offline",  # Force offline status for unresolved devices
                         "available": False,
+                        "volume": None,
                         "play_count": stored_stats.get("play_count", 0),
                         "play_duration_ms": stored_stats.get("play_duration_ms", 0),
                         "current_session_ms": stored_stats.get("current_session_ms", 0),
@@ -832,6 +834,11 @@ class VirtualDlnaDevice:
         status_key, status_class, status_label = aggregate_status_lamp(
             overall_status, len(self.member_uuids)
         )
+
+        # Unified group volume for the web-UI slider: average the members that
+        # report one (cached state, no SOAP), None when none do.
+        from dlna.virtual.volume import group_volume
+        volume = group_volume([detail.get("volume") for detail in details])
         
 
         token = settings.get_token_for_uuid(self.uuid)
@@ -852,6 +859,7 @@ class VirtualDlnaDevice:
             "members": details,
             "member_count": len(self.member_uuids),
             "missing_members": missing,
+            "volume": volume,
             "binded": binded,
             "pin": pin_code,
             "pin_id": pin_id,

@@ -15,6 +15,18 @@ def average_group_volume(volumes) -> int:
     return sum(volumes) // len(volumes)
 
 
+def group_volume(member_volumes):
+    """Unified 0-100 volume for a group's web-UI slider: average the members
+    that report a volume, or None when none do (so the UI hides the slider,
+    matching a device with no volume). Reads cached member state rather than
+    issuing a SOAP GetVolume per poll.
+    """
+    known = [v for v in member_volumes if v is not None]
+    if not known:
+        return None
+    return average_group_volume(known)
+
+
 def map_volume_to_device(
     group_volume: int,
     device_min: int,

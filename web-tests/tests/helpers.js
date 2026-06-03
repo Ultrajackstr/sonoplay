@@ -92,4 +92,67 @@ async function mockApi(page, { devices = [], plexConnected = true } = {}) {
   await page.route('**/api/onboarding', (r) => r.fulfill({ json: NEUTRAL_ONBOARDING }));
 }
 
-module.exports = { device, devicesPayload, playing, paused, stopped, unlinked, mockApi, mockExternal };
+// --- Groups (virtual-devices) page fixtures + mocking -----------------------
+// The Groups page (/virtual-devices) fetches /api/virtual-devices, which carries
+// {virtual_devices, physical_devices}. A group's play state is derived from its
+// members' statuses; volume is the unified 0-100 aggregate the slider binds to.
+
+function group(over = {}) {
+  return {
+    uuid: 'grp-1', name: 'Living Room', model: 'SonoPlay Group', ip: '',
+    status: 'all_available', status_label: 'All Online', status_class: 'all-available',
+    is_heterogeneous: false, binded: true, pin_id: '',
+    volume: 40, current_session_ms: 50000,
+    members: [{ uuid: 'm-1', name: 'Speaker One', ip: '10.0.0.5', status: 'playing', available: true, volume: 40 }],
+    member_count: 1, missing_members: [],
+    current_track: {
+      title: 'Song A', artist: 'Artist A', duration: 200000,
+      media: { container: 'flac', codec: 'flac', bitrate_kbps: 1411, sample_rate_hz: 44100, channels: 2 },
+      transcode: false,
+    },
+    ...over,
+  };
+}
+
+const memberPaused = { uuid: 'm-1', name: 'Speaker One', ip: '10.0.0.5', status: 'paused', available: true, volume: 40 };
+const groupPlaying = (over = {}) => group(over);
+const groupPaused = (over = {}) => group({ members: [memberPaused], ...over });
+
+function groupsPayload(groups, physical = []) {
+  return { virtual_devices: groups, physical_devices: physical };
+}
+
+async function mockGroupsApi(page, { groups = [], plexConnected = true } = {}) {
+  await mockExternal(page);
+  await page.route(/\/api\/virtual-devices(\?.*)?$/, (r) => r.fulfill({ json: groupsPayload(groups) }));
+  await page.route(/\/api\/devices(\?.*)?$/, (r) => r.fulfill({ json: devicesPayload([]) }));
+  await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: plexConnected } }));
+  await page.route('**/api/onboarding', (r) => r.fulfill({ json: NEUTRAL_ONBOARDING }));
+}
+
+// Models the real timing for the Groups command-latency test: wait=1 idles
+// ~5s (no events once paused), and the group's member flips to paused
+// ~flipAfterMs after the pause command lands (its check loop). The card must
+// update promptly via the no-wait fast-poll, not by waiting out the long-poll.
+async function mockLaggyGroupsBackend(page, { flipAfterMs = 500, longPollMs = 5000 } = {}) {
+  let isPaused = false;
+  await mockExternal(page);
+  await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: true } }));
+  await page.route('**/api/onboarding', (r) => r.fulfill({ json: NEUTRAL_ONBOARDING }));
+  await page.route(/\/api\/devices(\?.*)?$/, (r) => r.fulfill({ json: devicesPayload([]) }));
+  await page.route(/\/api\/virtual-devices(\?.*)?$/, async (r) => {
+    if (r.request().url().includes('wait=1')) {
+      await new Promise((res) => setTimeout(res, longPollMs));
+    }
+    return r.fulfill({ json: groupsPayload([isPaused ? groupPaused() : groupPlaying()]) });
+  });
+  await page.route('**/player/playback/pause**', (r) => {
+    setTimeout(() => { isPaused = true; }, flipAfterMs);
+    return r.fulfill({ status: 200, body: '' });
+  });
+}
+
+module.exports = {
+  device, devicesPayload, playing, paused, stopped, unlinked, mockApi, mockExternal,
+  group, groupPlaying, groupPaused, groupsPayload, mockGroupsApi, mockLaggyGroupsBackend,
+};

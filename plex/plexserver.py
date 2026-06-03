@@ -410,7 +410,17 @@ async def virtual_devices_page(request: Request):
 
 
 @s.get("/api/virtual-devices")
-async def api_virtual_devices():
+async def api_virtual_devices(wait: int = 0):
+    """Group list with per-group summaries.
+
+    With wait=1 this long-polls (like /api/devices?wait=1): it blocks until any
+    device reports a state / volume / track change, so the Groups page reflects
+    play/pause/volume changes made elsewhere near-instantly rather than on a
+    fixed interval. Group members are physical devices, so the same per-adapter
+    event wait powers it.
+    """
+    if wait == 1:
+        await _wait_for_any_device_event()
     virtual_devices = await list_virtual_devices_with_summaries()
     physical_devices = await list_physical_device_snapshots()
     return {
