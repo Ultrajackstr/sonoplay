@@ -66,3 +66,54 @@ test.describe('groups — command latency', () => {
     await expect(main).toHaveClass(/fa-play/, { timeout: 2500 });
   });
 });
+
+test.describe('groups — modal click zone (header only)', () => {
+  test('clicking the header opens the group details modal', async ({ page }) => {
+    await mockGroupsApi(page, { groups: [groupPlaying()] });
+    await goto(page);
+    await page.locator('.device-card .device-header').click();
+    await expect(page.locator('.swal2-popup')).toBeVisible();
+  });
+
+  test('clicking the now-playing area does NOT open the modal', async ({ page }) => {
+    await mockGroupsApi(page, { groups: [groupPlaying()] });
+    await goto(page);
+    await page.locator('.device-card .now-playing-track').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('.swal2-popup')).toHaveCount(0);
+  });
+});
+
+test.describe('groups — mute button', () => {
+  test('mute (volume>0) sends setParameters volume=0 with the group uuid', async ({ page }) => {
+    await mockGroupsApi(page, { groups: [groupPlaying({ volume: 40 })] });
+    let req = null;
+    await page.route('**/player/playback/setParameters**', (r) => {
+      req = r.request();
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    await page.locator('.device-card .volume-mute-btn').click();
+    await expect.poll(() => req && new URL(req.url()).searchParams.get('volume')).toBe('0');
+    expect(req.headers()['x-plex-target-client-identifier']).toBe('grp-1');
+  });
+});
+
+test.describe('groups — seekbar', () => {
+  test('clicking the progress bar seeks to that fraction of the track', async ({ page }) => {
+    await mockGroupsApi(page, { groups: [groupPlaying()] }); // duration 200000ms
+    let req = null;
+    await page.route('**/player/playback/seekTo**', (r) => {
+      req = r.request();
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    const bar = page.locator('.device-card .progress-bar');
+    const box = await bar.boundingBox();
+    await bar.click({ position: { x: box.width * 0.75, y: Math.max(1, box.height / 2) } });
+    await expect.poll(() => req && new URL(req.url()).searchParams.get('offset')).not.toBeNull();
+    const offset = parseInt(new URL(req.url()).searchParams.get('offset'), 10);
+    expect(offset).toBeGreaterThan(135000); // ~75% of 200000 = 150000, tolerance for click precision
+    expect(offset).toBeLessThan(165000);
+  });
+});
