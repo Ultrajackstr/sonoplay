@@ -1,24 +1,25 @@
 """Regression guard for the web UI playback buttons.
 
-The device cards in both templates expose previous / pause / next buttons that
-call a local ``sendCommand(uuid, command)``. Those must hit routes the live
-FastAPI app (``plex/plexserver.py``) actually registers.
+The device cards in both templates expose previous / pause / play / next buttons
+whose onclick calls a local ``sendCommand(uuid, command)``. That delegates to
+``sendPlaybackCommand()`` in ``static/js/shared.js``, which builds the actual
+``/player/playback/<name>`` URL. This pins:
 
-Before this guard existed both templates were calling endpoints that did not
-exist on the live server, so every button 404'd ("Failed to send command"):
+  * the button tokens stay wired in the templates,
+  * both pages delegate to the shared helper (the dedup), and
+  * the shared helper only targets routes the live FastAPI app
+    (``plex/plexserver.py``) actually registers,
 
-  * ``virtual_devices.html``    -> GET  /api/player/playback/{previous,pause,next}
-  * ``discovered_devices.html`` -> POST /api/devices/${uuid}/command
-
-The live app only exposes ``/player/playback/<canonical-name>`` (no /api prefix,
-canonical names ``skipPrevious`` / ``pause`` / ``skipNext``). This test pins that
-contract so the front-end URLs and the route names can't silently drift apart.
+so the front-end URLs and the route names can't silently drift apart. (Before
+this guard, the templates called endpoints that didn't exist and every button
+404'd "Failed to send command".)
 """
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PLEXSERVER = ROOT / "plex" / "plexserver.py"
+SHARED_JS = ROOT / "static" / "js" / "shared.js"
 TEMPLATES = {
     "discovered": ROOT / "templates" / "discovered_devices.html",
     "virtual": ROOT / "templates" / "virtual_devices.html",
@@ -31,10 +32,16 @@ def _registered_playback_routes():
     return set(re.findall(r'@s\.\w+\("(/player/playback/[^"?]+)"', src))
 
 
-def _sendcommand_body(template_path):
-    """Return the JS source of the sendCommand(...) function via brace matching."""
-    text = template_path.read_text(encoding="utf-8")
-    start = text.index("function sendCommand")
+def _all_registered_routes():
+    """Every path the FastAPI app declares (any HTTP verb)."""
+    src = PLEXSERVER.read_text(encoding="utf-8")
+    return set(re.findall(r'@s\.\w+\("([^"?]+)"', src))
+
+
+def _shared_function_body(name):
+    """Return the JS source of a top-level function in shared.js via brace matching."""
+    text = SHARED_JS.read_text(encoding="utf-8")
+    start = text.index(f"function {name}")
     depth = 0
     i = text.index("{", start)
     while i < len(text):
@@ -45,54 +52,55 @@ def _sendcommand_body(template_path):
             if depth == 0:
                 return text[start:i + 1]
         i += 1
-    raise AssertionError(f"could not find end of sendCommand in {template_path}")
+    raise AssertionError(f"could not find end of {name} in shared.js")
 
 
 def test_backend_exposes_canonical_playback_routes():
     routes = _registered_playback_routes()
-    for name in ("pause", "skipNext", "skipPrevious"):
+    for name in ("play", "pause", "skipNext", "skipPrevious"):
         assert f"/player/playback/{name}" in routes, (
             f"expected backend route /player/playback/{name}; got {sorted(routes)}"
         )
 
 
-def test_templates_do_not_call_phantom_endpoints():
+def test_no_phantom_playback_endpoints_anywhere():
+    """The pre-fix broken endpoints must not reappear in templates or shared.js."""
+    for path in [SHARED_JS, *TEMPLATES.values()]:
+        text = path.read_text(encoding="utf-8")
+        assert "/api/player/playback/" not in text, f"{path.name}: stale /api/player/playback/ prefix"
+        assert "/api/devices/${uuid}/command" not in text, f"{path.name}: phantom POST command route"
+
+
+def test_shared_sendcommand_targets_registered_routes():
+    routes = _registered_playback_routes()
+    body = _shared_function_body("sendPlaybackCommand")
+    assert "/player/playback/" in body, "sendPlaybackCommand must fetch /player/playback/"
+    assert "/api/" not in body, "sendPlaybackCommand must not call an /api/ path"
+    endpoints = set(re.findall(r"""['"](skip\w+|pause|play|stop|seekTo)['"]""", body))
+    assert endpoints, "no canonical endpoint names found in sendPlaybackCommand"
+    for ep in endpoints:
+        assert f"/player/playback/{ep}" in routes, (
+            f"sendPlaybackCommand maps to /player/playback/{ep} which is not a registered route"
+        )
+
+
+def test_templates_delegate_sendcommand_to_shared_helper():
+    """Both pages delegate to the shared helper rather than re-implement the
+    fetch (the dedup); guards against a copy drifting back in."""
     for label, path in TEMPLATES.items():
         text = path.read_text(encoding="utf-8")
-        assert "/api/player/playback/" not in text, f"{label}: stale /api/player/playback/ prefix"
-        assert "/api/devices/${uuid}/command" not in text, f"{label}: phantom POST command route"
-
-
-def test_templates_call_registered_playback_routes():
-    routes = _registered_playback_routes()
-    for label, path in TEMPLATES.items():
-        body = _sendcommand_body(path)
-        assert "/player/playback/" in body, f"{label}: sendCommand must fetch /player/playback/"
-        assert "/api/" not in body, f"{label}: sendCommand must not call an /api/ path"
-        endpoints = set(re.findall(r"""['"](skip\w+|pause|play|stop|seekTo)['"]""", body))
-        assert endpoints, f"{label}: no canonical endpoint names found in sendCommand"
-        for ep in endpoints:
-            assert f"/player/playback/{ep}" in routes, (
-                f"{label}: sendCommand maps to /player/playback/{ep} which is not a registered route"
-            )
+        assert "sendPlaybackCommand(" in text, f"{label}: sendCommand should call sendPlaybackCommand()"
 
 
 def test_templates_wire_both_play_and_pause():
     """The main transport button must offer BOTH pause (while playing) and play
-    (to resume while paused). Without a wired 'play' command a paused device
-    cannot be resumed from the UI -- the original bug report."""
+    (to resume while paused)."""
     for label, path in TEMPLATES.items():
         text = path.read_text(encoding="utf-8")
         assert ", 'pause')" in text, f"{label}: no pause command wired"
         assert ", 'play')" in text, (
             f"{label}: no play command wired -- a paused device can't be resumed from the UI"
         )
-
-
-def _all_registered_routes():
-    """Every path the FastAPI app declares (any HTTP verb)."""
-    src = PLEXSERVER.read_text(encoding="utf-8")
-    return set(re.findall(r'@s\.\w+\("([^"?]+)"', src))
 
 
 def test_nav_plex_widget_endpoints_exist():

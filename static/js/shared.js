@@ -33,3 +33,29 @@ function formatDuration(ms) {
     }
     return `${minutes}:${secondsStr}`;
 }
+
+/**
+ * Send a transport command to a device or group, then run onSuccess on success.
+ * Shared by the device and group pages (pinned by test_webui_playback_routes).
+ * @param {string} uuid - target client identifier
+ * @param {string} command - UI token (previous|pause|play|next) or a canonical route name
+ * @param {Function} [onSuccess] - invoked after a successful command (e.g. a refresh)
+ */
+async function sendPlaybackCommand(uuid, command, onSuccess) {
+    const endpoints = { previous: 'skipPrevious', pause: 'pause', play: 'play', next: 'skipNext' };
+    const endpoint = endpoints[command] || command;
+    try {
+        const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {
+            method: 'GET',
+            headers: {
+                'X-Plex-Target-Client-Identifier': uuid,
+                'X-Plex-Client-Identifier': 'sonoplay'
+            }
+        });
+        if (!response.ok) throw new Error('Command failed');
+        if (typeof onSuccess === 'function') onSuccess();
+    } catch (error) {
+        console.error('Command error:', error);
+        Swal.fire('Error', 'Failed to send command', 'error');
+    }
+}

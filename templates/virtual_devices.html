@@ -523,22 +523,7 @@
 
     // Playback Commands
     async function sendCommand(uuid, command) {
-        const endpoints = { previous: 'skipPrevious', pause: 'pause', play: 'play', next: 'skipNext' };
-        const endpoint = endpoints[command] || command;
-        try {
-            const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {
-                method: 'GET',
-                headers: {
-                    'X-Plex-Target-Client-Identifier': uuid,
-                    'X-Plex-Client-Identifier': 'sonoplay'
-                }
-            });
-            if (!response.ok) throw new Error('Command failed');
-            fetchGroups();
-        } catch (error) {
-            console.error('Command error:', error);
-            Swal.fire('Error', 'Failed to send command', 'error');
-        }
+        return sendPlaybackCommand(uuid, command, fetchGroups);
     }
 
     // Link/Relink
