@@ -154,7 +154,7 @@ class PlexLib(object):
 
 
 class DlnaState(object):
-    changing_attrs = ("state", "volume", "elapsed", "current_uri", "current_track_duration", "muted")
+    changing_attrs = frozenset(("state", "volume", "elapsed", "current_uri", "current_track_duration", "muted"))
 
     def __init__(self, adapter, state_change_callback=None):
         self.adapter = adapter

@@ -916,7 +916,6 @@ async def set_parameters(commandID: int,
     return await build_response("", target_uuid=target_uuid)
 
 
-_poll_lock = asyncio.Lock()
 _waiting_poll_count = 0
 
 @s.get("/player/timeline/poll")
@@ -927,12 +926,13 @@ async def timeline_poll(request: Request,
                         client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
     global _waiting_poll_count
-    async with _poll_lock:
-        _waiting_poll_count += 1
-        current_count = _waiting_poll_count
+    # Lock-free gauge: asyncio doesn't interleave a bare += between awaits, and
+    # this only feeds a debug line, so the old per-poll lock pair was pure
+    # overhead on the hottest endpoint.
+    _waiting_poll_count += 1
     try:
-        if current_count > 3:
-            logger.debug("High poll count: %s", current_count)
+        if _waiting_poll_count > 3:
+            logger.debug("High poll count: %s", _waiting_poll_count)
         begin_time = datetime.now(timezone.utc)
         await guess_host_ip(request)
         sub_man.update_command_id(target_uuid, client_uuid, commandID)
@@ -956,8 +956,7 @@ async def timeline_poll(request: Request,
         spawn_task(sub_man.notify_server_device(device, force=True))
         return await build_response(msg, device=device, headers=timeline_poll_headers(device))
     finally:
-        async with _poll_lock:
-            _waiting_poll_count -= 1
+        _waiting_poll_count -= 1
 
 
 @s.get("/player/timeline/subscribe")
