@@ -154,6 +154,19 @@ def as_text(value, default=""):
     return str(extracted)
 
 
+def device_model_name(device_info, fallback=""):
+    """Pick the renderer's model from its UPnP device description.
+
+    Prefer modelName (UPnP-required, so usually present), then the optional
+    modelDescription, then the given fallback. Reading modelName first fixes
+    devices (e.g. the AMBEO) that omit modelDescription and would otherwise show
+    the fallback product name.
+    """
+    return (as_text(device_info.get('modelName'), '')
+            or as_text(device_info.get('modelDescription'), '')
+            or fallback)
+
+
 class DlnaDeviceService(object):
 
     def __init__(self, service_dict: dict, device):
@@ -444,8 +457,7 @@ class DlnaDevice(object):
                 device_info = self.info['device']
                 self.name = as_text(device_info.get('friendlyName'))
                 self.manufacturer = as_text(device_info.get('manufacturer'))
-                model_desc = device_info.get('modelDescription', settings.product)
-                self.model = as_text(model_desc, settings.product)
+                self.model = device_model_name(device_info, settings.product)
                 udn = as_text(device_info.get('UDN'))
                 if udn.startswith("uuid:"):
                     udn = udn[len("uuid:"):]
