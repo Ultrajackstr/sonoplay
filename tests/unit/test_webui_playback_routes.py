@@ -103,6 +103,16 @@ def test_templates_wire_both_play_and_pause():
         )
 
 
+def test_link_flows_delegate_to_shared_confirm_helper():
+    """Both pages' link/relink flows use the shared confirmPlexPin helper (the
+    PIN-flow dedup); guards against a copy drifting back into a template."""
+    assert "function confirmPlexPin(" in SHARED_JS.read_text(encoding="utf-8")
+    for label, path in TEMPLATES.items():
+        assert "confirmPlexPin(" in path.read_text(encoding="utf-8"), (
+            f"{label}: link/relink should delegate to confirmPlexPin()"
+        )
+
+
 def test_nav_plex_widget_endpoints_exist():
     """base.html's Plex nav widget calls /api/plex-status (checkPlexStatus) and
     /api/plex-disconnect (disconnectPlex); both must be registered routes."""

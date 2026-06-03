@@ -56,7 +56,9 @@ window.Swal = {
     var title = document.createElement('h2'); title.className = 'swal2-title'; title.textContent = opts.title || '';
     var html = document.createElement('div'); html.className = 'swal2-html-container'; html.innerHTML = opts.html || (opts.text || '');
     pop.appendChild(title); pop.appendChild(html); c.appendChild(pop); document.body.appendChild(c);
-    return Promise.resolve({ isConfirmed: false, isDismissed: true, value: undefined });
+    // Tests set window.__swalConfirmNext = true to simulate the user confirming.
+    var confirmed = !!window.__swalConfirmNext;
+    return Promise.resolve({ isConfirmed: confirmed, isDismissed: !confirmed, value: undefined });
   },
   showLoading() {},
   close() { document.querySelectorAll('.swal2-container').forEach(function (e) { e.remove(); }); },
