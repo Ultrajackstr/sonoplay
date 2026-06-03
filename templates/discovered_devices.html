@@ -281,7 +281,33 @@
     }
 
     async function sendCommand(uuid, command) {
-        return sendPlaybackCommand(uuid, command, refreshDevices);
+        return sendPlaybackCommand(uuid, command, () => refreshUntilDeviceChanges(uuid));
+    }
+
+    // A transport command (play/pause/next/prev) changes the device's state, but
+    // that change isn't visible until the backend's periodic check loop sees it,
+    // and the idle long-poll can take ~5s to return. A single immediate refresh
+    // races ahead of the backend and reads the OLD state. So after a command we
+    // briefly fast-poll (no-wait) until this device's transport state actually
+    // changes -- converging in well under a second -- instead of waiting out the
+    // long-poll. Bounded, and a newer command supersedes an in-flight burst.
+    let burstGen = 0;
+    function deviceSignature(uuid) {
+        const d = lastFetchedDevices.find((x) => x.uuid === uuid);
+        if (!d) return '';
+        const t = d.current_track || {};
+        return `${d.status}|${t.title || ''}|${t.key || ''}`;
+    }
+    async function refreshUntilDeviceChanges(uuid) {
+        const myGen = ++burstGen;
+        const before = deviceSignature(uuid);
+        const delays = [150, 250, 350, 500, 700, 900]; // ~2.85s, snappy early
+        for (const ms of delays) {
+            await sleep(ms);
+            if (myGen !== burstGen) return;           // a newer command took over
+            await refreshDevices();                   // no-wait: reads real state
+            if (deviceSignature(uuid) !== before) return;
+        }
     }
 
     // Volume slider: suppress the grid re-render while the user is interacting

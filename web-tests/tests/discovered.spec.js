@@ -9,6 +9,29 @@
 const { test, expect } = require('@playwright/test');
 const { playing, paused, stopped, mockApi, mockExternal } = require('./helpers');
 
+// Serve /api/devices so the no-wait variant returns the CURRENT state instantly
+// while the wait=1 long-poll idles for `longPollMs` (no events fire once a
+// device is paused/idle, so the real server waits out its ~5s timeout). The
+// returned device flips to paused `flipAfterMs` after the pause command lands,
+// modelling the backend's periodic check loop.
+async function mockLaggyBackend(page, { flipAfterMs = 500, longPollMs = 5000 } = {}) {
+  let isPaused = false;
+  await mockExternal(page);
+  await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: true } }));
+  await page.route('**/api/onboarding', (r) => r.fulfill({ json: { eligible: false, enabled: false, completed: true, steps: {} } }));
+  await page.route('**/api/virtual-devices', (r) => r.fulfill({ json: { groups: [], total: 0 } }));
+  await page.route(/\/api\/devices(\?.*)?$/, async (r) => {
+    if (r.request().url().includes('wait=1')) {
+      await new Promise((res) => setTimeout(res, longPollMs)); // idle long-poll
+    }
+    return r.fulfill({ json: { devices: [isPaused ? paused() : playing()], total_devices: 1 } });
+  });
+  await page.route('**/player/playback/pause**', (r) => {
+    setTimeout(() => { isPaused = true; }, flipAfterMs); // backend reflects it late
+    return r.fulfill({ status: 200, body: '' });
+  });
+}
+
 const goto = (page) => page.goto('/', { waitUntil: 'domcontentloaded' });
 
 test.describe('discovered devices — card render states', () => {
@@ -190,6 +213,21 @@ test.describe('discovered devices — volume slider', () => {
     vol = 70; // external change, e.g. from the phone
     await page.evaluate(() => window.refreshDevices());
     await expect(page.locator('.volume-slider')).toHaveValue('70');
+  });
+});
+
+test.describe('discovered devices — command latency', () => {
+  test('pause reflects promptly without waiting out the idle long-poll', async ({ page }) => {
+    // The pause lands in the backend ~500ms after the command; the idle
+    // long-poll would take 5s. The card must flip to the play (paused) icon
+    // well before then -- i.e. via a fast no-wait re-poll, not the long-poll.
+    await mockLaggyBackend(page, { flipAfterMs: 500, longPollMs: 5000 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const main = page.locator('.device-card .playback-btn.main i');
+    await expect(main).toHaveClass(/fa-pause/);
+
+    await page.locator('.device-card .playback-btn.main').click(); // pause
+    await expect(main).toHaveClass(/fa-play/, { timeout: 2500 });
   });
 });
 
