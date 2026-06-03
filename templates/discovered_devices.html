@@ -49,9 +49,9 @@
     let lastFetchedDevices = [];
 
     // API Functions
-    async function fetchDevices() {
+    async function fetchDevices(wait = false) {
         try {
-            const response = await fetch('/api/devices');
+            const response = await fetch(`/api/devices${wait ? '?wait=1' : ''}`);
             const data = await response.json();
             return data.devices || [];
         } catch (error) {
@@ -358,8 +358,8 @@
         });
     }
 
-    async function refreshDevices() {
-        const devices = await fetchDevices();
+    async function refreshDevices(wait = false) {
+        const devices = await fetchDevices(wait);
         lastFetchedDevices = devices;
         
         // Filter by search
@@ -386,13 +386,27 @@
         renderDeviceGrid(filteredDevices);
     });
 
-    // Initial load and polling
+    // Initial load + reactive polling. /api/devices?wait=1 long-polls server-side
+    // (it returns the moment any device's state/volume/track changes, else after
+    // a few seconds), so the dashboard tracks changes made from the phone or the
+    // remote almost immediately. The loop pauses while the tab is hidden and
+    // backs off on error.
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function devicePollLoop() {
+        await refreshDevices();              // fast first paint (no wait)
+        while (true) {
+            if (document.hidden) { await sleep(1000); continue; }
+            try {
+                await refreshDevices(true);  // long-poll
+            } catch (e) {
+                await sleep(3000);           // back off on error
+            }
+            await sleep(200);                // floor: avoid a hot loop on instant returns
+        }
+    }
     document.addEventListener('DOMContentLoaded', () => {
-        refreshDevices();
-        // Poll every 5 seconds, but skip while the tab is hidden -- background
-        // tabs were otherwise hammering /api/devices, which fans out per device.
-        setInterval(() => { if (!document.hidden) refreshDevices(); }, 5000);
-        // Refresh immediately when the tab becomes visible again.
+        devicePollLoop();
+        // Snappy refresh when returning to the tab (don't wait out a long-poll).
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) refreshDevices();
         });

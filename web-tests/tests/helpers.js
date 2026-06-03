@@ -84,7 +84,9 @@ async function mockExternal(page) {
 
 async function mockApi(page, { devices = [], plexConnected = true } = {}) {
   await mockExternal(page);
-  await page.route('**/api/devices', (r) => r.fulfill({ json: devicesPayload(devices) }));
+  // Match /api/devices and /api/devices?wait=1 (the long-poll), but NOT the
+  // /api/devices/{uuid}/capabilities sub-path.
+  await page.route(/\/api\/devices(\?.*)?$/, (r) => r.fulfill({ json: devicesPayload(devices) }));
   await page.route('**/api/virtual-devices', (r) => r.fulfill({ json: { groups: [], total: 0 } }));
   await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: plexConnected } }));
   await page.route('**/api/onboarding', (r) => r.fulfill({ json: NEUTRAL_ONBOARDING }));

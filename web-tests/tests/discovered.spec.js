@@ -168,10 +168,20 @@ test.describe('discovered devices — volume slider', () => {
     expect(req.headers()['x-plex-target-client-identifier']).toBe('dev-1');
   });
 
+  test('the dashboard long-polls /api/devices?wait=1', async ({ page }) => {
+    await mockApi(page, { devices: [playing()] });
+    const reqPromise = page.waitForRequest(
+      (r) => r.url().includes('/api/devices') && r.url().includes('wait=1'),
+      { timeout: 5000 }
+    );
+    await goto(page);
+    expect(await reqPromise).toBeTruthy();
+  });
+
   test('reflects an externally-changed volume on the next poll', async ({ page }) => {
     let vol = 40;
     await mockExternal(page);
-    await page.route('**/api/devices', (r) =>
+    await page.route(/\/api\/devices(\?.*)?$/, (r) =>
       r.fulfill({ json: { devices: [playing({ volume: vol })], total_devices: 1 } }));
     await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: true } }));
     await page.route('**/api/onboarding', (r) => r.fulfill({ json: { eligible: false, enabled: false, completed: true, steps: {} } }));

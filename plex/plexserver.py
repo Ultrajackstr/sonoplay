@@ -559,10 +559,40 @@ async def api_delete_virtual_device(virtual_uuid: str):
     return Response(status_code=204)
 
 
+async def _wait_for_any_device_event():
+    """Block until any device emits an interesting event (state / volume / track
+    change or a seek) or a short timeout elapses. Powers the web UI's
+    /api/devices?wait=1 long-poll, reusing the same per-adapter event mechanism
+    as the Plex timeline poll. The timeout keeps progress reasonably fresh while
+    state/volume/track changes wake it near-instantly."""
+    timeout = settings.plex_notify_interval * 10  # ~5s
+    waiters = []
+    for d in list(devices):
+        adapter = await adapter_by_device(d)
+        waiters.append(asyncio.ensure_future(adapter.wait_for_event(
+            timeout, interesting_fields=['state', 'volume', 'current_uri', 'elapsed_jump'])))
+    if not waiters:
+        await asyncio.sleep(timeout)
+        return
+    try:
+        await asyncio.wait(waiters, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for w in waiters:
+            w.cancel()
+        await asyncio.gather(*waiters, return_exceptions=True)
+
+
 @s.get("/api/devices")
-async def api_devices(request: Request):
-    """API endpoint that returns device list with extended metadata including current track info."""
+async def api_devices(request: Request, wait: int = 0):
+    """API endpoint that returns device list with extended metadata including current track info.
+
+    With wait=1 this long-polls: it blocks until any device reports a state /
+    volume / track change (or a short timeout), so the web UI reflects changes
+    made elsewhere (phone, remote) near-instantly rather than on a fixed interval.
+    """
     await guess_host_ip(request)
+    if wait == 1:
+        await _wait_for_any_device_event()
     devices_list = []
     
     for d in devices:
