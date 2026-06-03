@@ -386,8 +386,6 @@ class DlnaState(object):
             self.muted = bool(muted_value)
         changed_state = self.end_change_session()
         if changed_state and self.state_change_callback:
-            # if __debug__:
-            #     print(f"{self.dlna.name} check loop {changed_state.toDict()} {self} in thread {current_thread().name}")
             self.state_change_callback(changed_state)
 
     @property
@@ -503,8 +501,6 @@ class PlexDlnaAdapter(object):
         self.no_notice = False
         self.loop = asyncio.get_running_loop()
         self.wait_state_change_events = []
-        self.delay_stop_state_looping_task: asyncio.Task = None
-        self.waiting_sub = 0
         self.current_track_info = None
         stored_stats = settings.get_device_stats(self.dlna.uuid)
         self.stats_play_count = stored_stats.get('play_count', 0)
@@ -528,7 +524,6 @@ class PlexDlnaAdapter(object):
         self._suppress_auto_next = False
         self._last_operation_finish_time: Optional[float] = None
         self._post_operation_protection_window = 2.0  # seconds
-        self._last_finished_target_uri: Optional[str] = None
         self._in_false_stop_recovery = False
         self._auto_next_in_flight = False
         # Premature STOPPED filtering (LMS-uPnP #63, go2tv #43)
@@ -586,7 +581,6 @@ class PlexDlnaAdapter(object):
         logger.debug("%s transport operation %d finished", self.dlna.name, operation_id)
         # Record finish time and URI for post-operation protection
         self._last_operation_finish_time = time.monotonic()
-        self._last_finished_target_uri = self._active_target_uri
         # Clear active operation state
         self._active_operation_id = 0
         self._active_target_uri = None
@@ -1266,27 +1260,10 @@ class PlexDlnaAdapter(object):
         # Force a state check on next loop to sync with actual DLNA device position
         self.state.check_all_next_loop = True
 
-    async def get_elapsed(self):
-        position_info = await self.dlna.GetPositionInfo()
-        if position_info is None:
-            return 0
-        t = position_info.RelTime
-        t = parse_timedelta(t)
-        return int(t.total_seconds() * 1000)
-
-    async def get_volume(self):
-        volume = await self.dlna.GetVolume()
-        volume = int(volume.CurrentVolume)
-        return convert_volume(volume, self.dlna.volume_max, self.dlna.volume_min, 100, 0, 1)
-
     async def set_volume(self, volume):
         volume = convert_volume(volume, 100, 0, self.dlna.volume_max, self.dlna.volume_min, self.dlna.volume_step)
         await self.dlna.SetVolume(volume)
         self.state.check_all_next_loop = True
-
-    async def is_muted(self):
-        mute = await self.dlna.GetMute()
-        return mute.CurrentMute
 
     def start_plex_tv_notify(self):
         self._plex_tv_task = asyncio.create_task(

@@ -1,8 +1,6 @@
 """Version and startup banner for SonoPlay."""
 
 VERSION = "1.1.0"
-LICENSE = "GPL-3.0"
-PRODUCT = "SonoPlay"
 
 
 def print_banner() -> None:

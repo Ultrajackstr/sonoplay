@@ -284,6 +284,32 @@ async def plex_status():
     return {"connected": False}
 
 
+@s.post("/api/plex-disconnect")
+async def plex_disconnect():
+    """Unlink every device from Plex by clearing all stored bind tokens."""
+    unlinked = 0
+    for d in devices:
+        adapter = await adapter_by_device(d)
+        if adapter.plex_bind_token is None:
+            continue
+        settings.set_token_for_uuid(d.uuid, None)
+        adapter.plex_bind_token = None
+        pin_login.clear_pin_cache(d.uuid)
+        await adapter.update_plex_tv_connection()
+        unlinked += 1
+    for vd in list_virtual_devices():
+        if settings.get_token_for_uuid(vd.uuid) is None:
+            continue
+        settings.set_token_for_uuid(vd.uuid, None)
+        pin_login.clear_pin_cache(vd.uuid)
+        adapter = await adapter_by_device(vd)
+        adapter.plex_bind_token = None
+        await adapter.update_plex_tv_connection()
+        unlinked += 1
+    logger.info("Plex disconnect: unlinked %d device(s)", unlinked)
+    return {"status": "disconnected", "unlinked": unlinked}
+
+
 @s.get("/")
 async def link_page(request: Request):
     await guess_host_ip(request)

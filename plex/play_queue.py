@@ -156,13 +156,6 @@ class PlayQueue(object):
     async def selected_track(self):
         return await self.track(await self.selected_offset())
 
-    async def prev_track(self):
-        return await self.next_track(reverse=True)
-
-    async def next_track(self, reverse=False):
-        direction = -1 if reverse else 1
-        return await self.track(await self.selected_offset() + direction)
-
     async def select_track_key(self, key):
         for idx, track in enumerate(await self.available_tracks()):
             if track.key == key:

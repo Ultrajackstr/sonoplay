@@ -770,34 +770,6 @@ body {
    UTILITY CLASSES
    ============================================ */
 
-.text-muted {
-    color: var(--text-tertiary);
-}
-
-.text-primary {
-    color: var(--accent);
-}
-
-.text-success {
-    color: var(--success);
-}
-
-.text-danger {
-    color: var(--danger);
-}
-
-.mb-0 { margin-bottom: 0; }
-.mb-1 { margin-bottom: var(--space-xs); }
-.mb-2 { margin-bottom: var(--space-sm); }
-.mb-3 { margin-bottom: var(--space-md); }
-.mb-4 { margin-bottom: var(--space-lg); }
-
-.mt-0 { margin-top: 0; }
-.mt-1 { margin-top: var(--space-xs); }
-.mt-2 { margin-top: var(--space-sm); }
-.mt-3 { margin-top: var(--space-md); }
-.mt-4 { margin-top: var(--space-lg); }
-
 /* Hidden utility */
 .hidden {
     display: none !important;
@@ -810,7 +782,6 @@ body {
 }
 
 button:focus-visible,
-.btn:focus-visible,
 a:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;

@@ -59,9 +59,6 @@ DEVICE_ID_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# Backward compatibility alias
-UUID_PATTERN = DEVICE_ID_PATTERN
-
 
 def is_valid_device_uuid(uuid: str | None) -> bool:
     """Validate a device identifier format.

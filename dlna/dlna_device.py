@@ -133,24 +133,18 @@ devices = []
 devices_lock = asyncio.Lock()
 
 
-async def add_device(device) -> None:
-    """Add a device to the list with thread-safe locking."""
-    async with devices_lock:
-        # Check if device already exists
-        for existing in devices:
-            if existing.uuid == device.uuid:
-                return  # Already exists
-        devices.append(device)
+def resolve_subscribe_timeout(device, timeout_sec=None):
+    """Resolve the DLNA SUBSCRIBE timeout, in seconds.
 
-
-async def remove_device(uuid: str) -> bool:
-    """Remove a device by UUID with thread-safe locking."""
-    async with devices_lock:
-        for i, device in enumerate(devices):
-            if device.uuid == uuid:
-                devices.pop(i)
-                return True
-        return False
+    An explicit value wins; otherwise honor the device's subscription_timeout
+    quirk (HEOS/Denon/Marantz need a longer window) and fall back to the global
+    default. Callers must pass timeout_sec=None for the quirk to take effect.
+    """
+    if timeout_sec is not None:
+        return timeout_sec
+    from dlna.quirks import get_device_quirks
+    quirks = get_device_quirks(device)
+    return quirks.get("subscription_timeout") or settings.dlna_subscribe_timeout
 
 
 def as_text(value, default=""):
@@ -175,9 +169,6 @@ class DlnaDeviceService(object):
         self.subscribed = False
         self._spec_info = None
         self.next_subscribe_call_time = None
-        # Subscription expiry tracking for auto-renewal
-        self._subscription_expiry: datetime | None = None
-        self._resubscribe_margin_seconds = 30
 
     def payload_from_template(self, action: str, data: dict):
         fields = ''
@@ -339,11 +330,7 @@ class DlnaDeviceService(object):
                 raise
 
     async def subscribe(self, timeout_sec=None):
-        if timeout_sec is None:
-            # Check for device-specific quirk (e.g., HEOS 9-minute limit)
-            from dlna.quirks import get_device_quirks
-            quirks = get_device_quirks(self.device)
-            timeout_sec = quirks.get("subscription_timeout") or settings.dlna_subscribe_timeout
+        timeout_sec = resolve_subscribe_timeout(self.device, timeout_sec)
         if settings.host_ip is None:
             settings.host_ip = guess_local_ip()
         if settings.host_ip in (None, "0.0.0.0"):
@@ -364,17 +351,9 @@ class DlnaDeviceService(object):
         async with g.http.request("SUBSCRIBE", self.event_url, headers=headers) as response:
             if response.ok:
                 self.next_subscribe_call_time = datetime.now(timezone.utc) + timedelta(seconds=(timeout_sec // 2))
-                self._subscription_expiry = datetime.now(timezone.utc) + timedelta(seconds=timeout_sec)
                 logger.debug("%s subscribed, expires in %ds", self.device.name, timeout_sec)
                 return True
         return False
-
-    def needs_resubscription(self) -> bool:
-        """Check if subscription should be renewed."""
-        if self._subscription_expiry is None:
-            return False
-        margin = timedelta(seconds=self._resubscribe_margin_seconds)
-        return datetime.now(timezone.utc) >= (self._subscription_expiry - margin)
 
     async def get_spec(self, client: aiohttp.ClientSession = None):
         if self._spec_info is not None:
@@ -607,16 +586,19 @@ class DlnaDevice(object):
         logger.debug("%s wait_for_can_play: timeout after %.1fs", self.name, max_wait)
         return False
 
-    async def subscribe(self, service_type: str = UPNP_AVT_SERVICE_TYPE, timeout_sec=120):
+    async def subscribe(self, service_type: str = UPNP_AVT_SERVICE_TYPE, timeout_sec=None):
         await self.get_data()
         service = self._get_service(service_type)
         await service.subscribe(timeout_sec=timeout_sec)
 
-    async def loop_subscribe(self, service_type: str = UPNP_AVT_SERVICE_TYPE, timeout_sec=120):
+    async def loop_subscribe(self, service_type: str = UPNP_AVT_SERVICE_TYPE, timeout_sec=None):
         service = self._get_service(service_type)
         if service.subscribed:
             return
         service.subscribed = True
+        # Resolve once (honors the subscription_timeout quirk) so the renewal
+        # cadence and backoff sleeps match the timeout actually requested.
+        timeout_sec = resolve_subscribe_timeout(service.device, timeout_sec)
         while service.subscribed:
             try:
                 await self.subscribe(service_type=service_type, timeout_sec=timeout_sec)

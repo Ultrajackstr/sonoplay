@@ -43,28 +43,3 @@ def map_volume_to_device(
     
     return int(round(scaled))
 
-
-def map_device_to_group_volume(
-    device_volume: int,
-    device_min: int,
-    device_max: int,
-) -> int:
-    """Map a device's volume to 0-100 group percentage.
-    
-    Args:
-        device_volume: Current device volume
-        device_min: Device's minimum volume
-        device_max: Device's maximum volume
-        
-    Returns:
-        Group volume as 0-100 percentage
-    """
-    # Handle edge case of same min/max
-    if device_max == device_min:
-        return 100 if device_volume >= device_min else 0
-    
-    # Inverse linear interpolation
-    range_size = device_max - device_min
-    percentage = ((device_volume - device_min) / range_size) * 100
-    
-    return int(round(max(0, min(100, percentage))))

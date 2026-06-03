@@ -24,7 +24,6 @@ def get_protocol(gdm):
         def connection_made(self, transport):
             self.transport = transport
             self.is_connected = True
-            # print(f"gdm connected {gdm.device.name}")
             self.transport.sendto(f"HELLO * HTTP/1.0\n{gdm.client_data}".encode('utf8'),
                                   (GDM_MULTICAST_ADDR, GDM_MULTICAST_PORT))
 
@@ -34,7 +33,6 @@ def get_protocol(gdm):
                     return
                 try:
                     msg = f"HTTP/1.0 200 OK\n{gdm.client_data}"
-                    # print(f"Reply {addr}, {gdm.device.name}")
                     self.transport.sendto(msg.encode('utf8'), addr)
                 except Exception as e:
                     logger.warning("unable to send client message: %s", e)
@@ -57,13 +55,6 @@ class PlexGDM(object):
         self.socket = None
         self.protocol = None
         self.device = device
-
-    # def notify_new_device(self, device):
-    #     if self.protocol is not None and self.protocol.is_connected:
-    #         for client_data in self.client_data(device=device):
-    #             print(f"send gdm device {device.name}")
-    #             self.protocol.transport.sendto(f"HELLO * HTTP/1.0\n{client_data}".encode('utf8'),
-    #                                           (GDM_MULTICAST_ADDR, GDM_MULTICAST_PORT))
 
     @property
     def client_data(self):
@@ -128,10 +119,3 @@ class PlexGDM(object):
                 logger.debug("Expected cleanup error closing socket: %s", e)
             self.socket = None
         self.protocol = None
-
-
-if __name__ == "__main__":
-    gdm = PlexGDM()
-    loop = asyncio.get_event_loop()
-    gdm.run(loop)
-    loop.run_forever()

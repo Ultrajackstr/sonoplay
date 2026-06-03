@@ -87,3 +87,17 @@ def test_templates_wire_both_play_and_pause():
         assert ", 'play')" in text, (
             f"{label}: no play command wired -- a paused device can't be resumed from the UI"
         )
+
+
+def _all_registered_routes():
+    """Every path the FastAPI app declares (any HTTP verb)."""
+    src = PLEXSERVER.read_text(encoding="utf-8")
+    return set(re.findall(r'@s\.\w+\("([^"?]+)"', src))
+
+
+def test_nav_plex_widget_endpoints_exist():
+    """base.html's Plex nav widget calls /api/plex-status (checkPlexStatus) and
+    /api/plex-disconnect (disconnectPlex); both must be registered routes."""
+    routes = _all_registered_routes()
+    for path in ("/api/plex-status", "/api/plex-disconnect"):
+        assert path in routes, f"{path} is called by base.html but not registered in plexserver.py"

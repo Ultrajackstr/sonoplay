@@ -202,19 +202,6 @@ class VirtualDlnaDevice:
         missing = [uuid for uuid in self.member_uuids if uuid not in {d.uuid for d in resolved}]
         return resolved, missing
 
-    async def _primary_device(self) -> Optional["DlnaDevice"]:
-        from plex.adapters import adapter_by_device  # local import to avoid cycle
-
-        resolved, _ = await self._resolve_members()
-        if not resolved:
-            return None
-        for device in resolved:
-            adapter = await adapter_by_device(device)
-            stats = adapter.stats_snapshot()
-            if stats.get("status") in {"playing", "online"}:
-                return device
-        return resolved[0]
-
     def _ensure_control(self, member_adapters: Iterable["PlexDlnaAdapter"]):
         active_ids = set()
         for adapter in member_adapters:
