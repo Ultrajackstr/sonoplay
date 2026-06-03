@@ -548,6 +548,28 @@ body {
     color: var(--text-tertiary);
 }
 
+/* Volume slider */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+}
+
+.volume-slider {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.volume-value {
+    min-width: 2.5ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 /* Icon buttons (edit / delete on device + group cards) */
 .icon-btn {
     width: 36px;

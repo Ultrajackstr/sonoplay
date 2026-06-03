@@ -26,6 +26,7 @@ function device(over = {}) {
     play_count: 1,
     play_duration_ms: 1000,
     current_session_ms: 50000,
+    volume: 40,
     ...over,
   };
 }

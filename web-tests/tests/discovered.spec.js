@@ -7,7 +7,7 @@
 // Icon assertions check the DOM class (not glyph rendering) so they don't
 // depend on the FontAwesome web-font finishing loading.
 const { test, expect } = require('@playwright/test');
-const { playing, paused, stopped, mockApi } = require('./helpers');
+const { playing, paused, stopped, mockApi, mockExternal } = require('./helpers');
 
 const goto = (page) => page.goto('/', { waitUntil: 'domcontentloaded' });
 
@@ -142,6 +142,44 @@ test.describe('discovered devices — device capabilities modal', () => {
     await expect(body).toContainText('audio/flac');
     await expect(body).toContainText('Volume range');
     await expect(body).toContainText('Gapless');
+  });
+});
+
+test.describe('discovered devices — volume slider', () => {
+  test('renders the slider at the device volume', async ({ page }) => {
+    await mockApi(page, { devices: [playing({ volume: 35 })] });
+    await goto(page);
+    await expect(page.locator('.device-card .volume-slider')).toHaveValue('35');
+  });
+
+  test('moving the slider sends setParameters with the volume + target header', async ({ page }) => {
+    await mockApi(page, { devices: [playing()] });
+    let req = null;
+    await page.route('**/player/playback/setParameters**', (r) => {
+      req = r.request();
+      return r.fulfill({ status: 200, body: '' });
+    });
+    await goto(page);
+    await page.locator('.volume-slider').first().evaluate((el) => {
+      el.value = '70';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect.poll(() => req && new URL(req.url()).searchParams.get('volume')).toBe('70');
+    expect(req.headers()['x-plex-target-client-identifier']).toBe('dev-1');
+  });
+
+  test('reflects an externally-changed volume on the next poll', async ({ page }) => {
+    let vol = 40;
+    await mockExternal(page);
+    await page.route('**/api/devices', (r) =>
+      r.fulfill({ json: { devices: [playing({ volume: vol })], total_devices: 1 } }));
+    await page.route('**/api/plex-status', (r) => r.fulfill({ json: { connected: true } }));
+    await page.route('**/api/onboarding', (r) => r.fulfill({ json: { eligible: false, enabled: false, completed: true, steps: {} } }));
+    await goto(page);
+    await expect(page.locator('.volume-slider')).toHaveValue('40');
+    vol = 70; // external change, e.g. from the phone
+    await page.evaluate(() => window.refreshDevices());
+    await expect(page.locator('.volume-slider')).toHaveValue('70');
   });
 });
 

@@ -626,6 +626,7 @@ async def api_devices(request: Request):
             'play_count': stats['play_count'],
             'play_duration_ms': stats['play_duration_ms'],
             'current_session_ms': stats['current_session_ms'],
+            'volume': adapter.state.volume,
             'current_track': current_track,
             'artwork_urls': artwork_urls,
             'plex_client': plex_client,

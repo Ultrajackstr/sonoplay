@@ -131,6 +131,9 @@
         const grid = document.getElementById('devicesList');
         const countEl = document.getElementById('deviceCount');
         if (!grid) return;
+        // Don't rebuild while a volume slider is being dragged (it would recreate
+        // the <input> mid-drag); the poll resumes shortly after interaction ends.
+        if (volumeInteracting) return;
 
         // Update count
         if (countEl) {
@@ -194,6 +197,7 @@
                 const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
                 
                 const quality = formatTrackQuality(track.media, track.transcode);
+                const volume = device.volume;
                 nowPlayingHtml = `
                     <div class="now-playing">
                         <div class="now-playing-label">Now Playing</div>
@@ -217,6 +221,14 @@
                             <i class="fas fa-step-forward"></i>
                         </button>
                     </div>
+                    ${volume != null ? `
+                    <div class="volume-control" onclick="event.stopPropagation()">
+                        <i class="fas fa-volume-down"></i>
+                        <input type="range" class="volume-slider" min="0" max="100" value="${volume}"
+                               oninput="onVolumeInput(this)" onchange="onVolumeChange('${safeUuid}', this)"
+                               onpointerdown="event.stopPropagation()" aria-label="Volume">
+                        <span class="volume-value">${volume}</span>
+                    </div>` : ''}
                 `;
             }
             
@@ -270,6 +282,27 @@
 
     async function sendCommand(uuid, command) {
         return sendPlaybackCommand(uuid, command, refreshDevices);
+    }
+
+    // Volume slider: suppress the grid re-render while the user is interacting
+    // (it would recreate the <input> and interrupt the drag). The flag clears
+    // ~1.5s after the last interaction, by which point the device poll has
+    // reconciled state.volume, so the next render shows the settled value.
+    let volumeInteracting = false;
+    let volumeInteractTimer = null;
+    function markVolumeInteracting() {
+        volumeInteracting = true;
+        clearTimeout(volumeInteractTimer);
+        volumeInteractTimer = setTimeout(() => { volumeInteracting = false; }, 1500);
+    }
+    function onVolumeInput(el) {
+        markVolumeInteracting();
+        const label = el.parentElement.querySelector('.volume-value');
+        if (label) label.textContent = el.value;
+    }
+    function onVolumeChange(uuid, el) {
+        markVolumeInteracting();
+        setDeviceVolume(uuid, parseInt(el.value, 10));
     }
 
     async function showDeviceDetails(uuid) {

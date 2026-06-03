@@ -157,3 +157,22 @@ function formatDeviceCapabilities(caps) {
     if (features.length) rows.push(`<p><strong>Supports:</strong> ${features.join(', ')}</p>`);
     return rows.join('');
 }
+
+/**
+ * Set a device's volume (0-100) via the Plex setParameters transport route.
+ * Fire-and-forget: errors are logged, not toasted (slider drags are frequent).
+ */
+async function setDeviceVolume(uuid, volume) {
+    try {
+        const response = await fetch(`/player/playback/setParameters?commandID=0&type=music&volume=${encodeURIComponent(volume)}`, {
+            method: 'GET',
+            headers: {
+                'X-Plex-Target-Client-Identifier': uuid,
+                'X-Plex-Client-Identifier': 'sonoplay'
+            }
+        });
+        if (!response.ok) throw new Error('Volume failed');
+    } catch (error) {
+        console.error('Volume error:', error);
+    }
+}
