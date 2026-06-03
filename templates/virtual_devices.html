@@ -1003,7 +1003,13 @@
     // Initial load and polling
     document.addEventListener('DOMContentLoaded', () => {
         fetchGroups();
-        setInterval(fetchGroups, 5000);
+        // Poll every 5 seconds, but skip while the tab is hidden -- background
+        // tabs were otherwise hammering /api/virtual-devices, which fans out.
+        setInterval(() => { if (!document.hidden) fetchGroups(); }, 5000);
+        // Refresh immediately when the tab becomes visible again.
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) fetchGroups();
+        });
     });
 </script>
 {% endblock %}

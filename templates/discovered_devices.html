@@ -499,8 +499,13 @@
     // Initial load and polling
     document.addEventListener('DOMContentLoaded', () => {
         refreshDevices();
-        // Poll every 5 seconds
-        setInterval(refreshDevices, 5000);
+        // Poll every 5 seconds, but skip while the tab is hidden -- background
+        // tabs were otherwise hammering /api/devices, which fans out per device.
+        setInterval(() => { if (!document.hidden) refreshDevices(); }, 5000);
+        // Refresh immediately when the tab becomes visible again.
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshDevices();
+        });
     });
 </script>
 {% endblock %}
