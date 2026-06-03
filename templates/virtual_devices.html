@@ -518,8 +518,10 @@
 
     // Playback Commands
     async function sendCommand(uuid, command) {
+        const endpoints = { previous: 'skipPrevious', pause: 'pause', next: 'skipNext' };
+        const endpoint = endpoints[command] || command;
         try {
-            const response = await fetch(`/api/player/playback/${command}?commandID=0&type=music`, {
+            const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {
                 method: 'GET',
                 headers: {
                     'X-Plex-Target-Client-Identifier': uuid,

@@ -398,11 +398,15 @@
     }
 
     async function sendCommand(uuid, command) {
+        const endpoints = { previous: 'skipPrevious', pause: 'pause', next: 'skipNext' };
+        const endpoint = endpoints[command] || command;
         try {
-            const response = await fetch(`/api/devices/${uuid}/command`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command })
+            const response = await fetch(`/player/playback/${endpoint}?commandID=0&type=music`, {
+                method: 'GET',
+                headers: {
+                    'X-Plex-Target-Client-Identifier': uuid,
+                    'X-Plex-Client-Identifier': 'sonoplay'
+                }
             });
             if (!response.ok) throw new Error('Command failed');
             refreshDevices();
