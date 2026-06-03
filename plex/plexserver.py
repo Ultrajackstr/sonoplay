@@ -418,8 +418,8 @@ async def api_virtual_devices():
     }
 
 
-@s.get("/api/onboarding")
-async def api_get_onboarding_state():
+def _onboarding_state_payload() -> dict:
+    """Build the onboarding-state response (shared by the GET and POST handlers)."""
     enabled = settings.enable_onboarding_wizard
     state = settings.datastore.get_onboarding_state()
     stored_devices = len(settings.datastore.get_all_device_uuids())
@@ -443,6 +443,11 @@ async def api_get_onboarding_state():
     }
 
 
+@s.get("/api/onboarding")
+async def api_get_onboarding_state():
+    return _onboarding_state_payload()
+
+
 @s.post("/api/onboarding")
 async def api_update_onboarding_state(payload: OnboardingStateUpdate):
     if not settings.enable_onboarding_wizard:
@@ -460,27 +465,7 @@ async def api_update_onboarding_state(payload: OnboardingStateUpdate):
         completed_at=completed_at
     )
 
-    state = settings.datastore.get_onboarding_state()
-    stored_devices = len(settings.datastore.get_all_device_uuids())
-    user_configured_devices = _count_user_configured_devices()
-    virtual_device_count = len(list_virtual_devices())
-    eligible = bool(
-        settings.enable_onboarding_wizard
-        and not state.get("completed")
-        and user_configured_devices == 0
-        and virtual_device_count == 0
-    )
-
-    return {
-        "enabled": settings.enable_onboarding_wizard,
-        "completed": bool(state.get("completed", False)),
-        "completed_at": state.get("completed_at"),
-        "steps": state.get("steps", {}),
-        "eligible": eligible,
-        "stored_device_count": stored_devices,
-        "user_configured_device_count": user_configured_devices,
-        "virtual_device_count": virtual_device_count,
-    }
+    return _onboarding_state_payload()
 
 
 # ===================== Audio Settings API =====================
@@ -756,10 +741,7 @@ async def play_media(request: Request,
     require_valid_uuid(target_uuid)
     await guess_host_ip(request)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
-    device = await get_device_by_uuid(target_uuid)
-    if device is None:
-        raise HTTPException(404)
-    adapter = await adapter_by_device(device, request.query_params)
+    device, adapter = await _resolve_or_404(target_uuid, request.query_params)
     if type_ == "music":
         await adapter.play_media(containerKey, key=key, offset=offset, paused=paused, query_params=request.query_params)
     else:
@@ -775,21 +757,27 @@ async def refresh_play_queue(request: Request,
                              client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
-    device = await get_device_by_uuid(target_uuid)
-    if device is None:
-        raise HTTPException(404)
-    adapter = await adapter_by_device(device, request.query_params)
+    device, adapter = await _resolve_or_404(target_uuid, request.query_params)
     await adapter.refresh_queue(playQueueID)
     return await build_response("", device=device)
 
 
-async def _adapter_or_404(target_uuid: str):
-    """Resolve the adapter for a music transport command, raising 404 if the
-    device is unknown. Shared preamble for stop/next/prev/seek/skipTo/setParameters."""
+async def _resolve_or_404(target_uuid: str, query_params=None):
+    """Resolve (device, adapter) for a music transport command, raising 404 if
+    the device is unknown. Shared preamble for the playback routes."""
     device = await get_device_by_uuid(target_uuid)
     if device is None:
         raise HTTPException(404, f"device not found {target_uuid}")
-    return await adapter_by_device(device)
+    if query_params is not None:
+        return device, await adapter_by_device(device, query_params)
+    return device, await adapter_by_device(device)
+
+
+async def _adapter_or_404(target_uuid: str):
+    """Adapter-only variant for routes that don't need the device object
+    (stop/next/prev/seek/skipTo/setParameters)."""
+    _, adapter = await _resolve_or_404(target_uuid)
+    return adapter
 
 
 @s.get("/player/playback/play")
@@ -799,10 +787,7 @@ async def play(commandID: int,
                client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
-    device = await get_device_by_uuid(target_uuid)
-    if device is None:
-        raise HTTPException(404)
-    adapter = await adapter_by_device(device)
+    device, adapter = await _resolve_or_404(target_uuid)
     if type_ == "music":
         await adapter.play()
     else:
@@ -817,10 +802,7 @@ async def pause(commandID: int,
                 client_uuid: str = Header(None, alias="x-plex-client-identifier")):
     require_valid_uuid(target_uuid)
     sub_man.update_command_id(target_uuid, client_uuid, commandID)
-    device = await get_device_by_uuid(target_uuid)
-    if device is None:
-        raise HTTPException(404)
-    adapter = await adapter_by_device(device)
+    device, adapter = await _resolve_or_404(target_uuid)
     if type_ == "music":
         await adapter.pause()
     return await build_response("", device=device)
