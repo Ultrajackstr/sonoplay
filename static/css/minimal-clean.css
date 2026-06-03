@@ -531,7 +531,10 @@ body {
     background: var(--bg-tertiary);
     border-radius: var(--radius-full);
     overflow: hidden;
-    /* Keep the thin 4px track but enlarge the click target for seeking. */
+    /* Keep the thin 4px track visible but enlarge the click target for seeking.
+       content-box is required: under the global border-box, height:4px would
+       include the 8px padding and collapse the track + fill to 0px (invisible). */
+    box-sizing: content-box;
     cursor: pointer;
     padding: 8px 0;
     background-clip: content-box;

@@ -312,4 +312,15 @@ test.describe('discovered devices — seekbar', () => {
     expect(offset).toBeGreaterThan(135000); // ~75% of 200000 = 150000, tolerance for click precision
     expect(offset).toBeLessThan(165000);
   });
+
+  test('the progress bar + fill render with a visible height', async ({ page }) => {
+    // Regression: enlarging the click target with padding under box-sizing:
+    // border-box collapsed the 4px track + fill to 0px (clickable but invisible).
+    await mockApi(page, { devices: [playing()] });
+    await goto(page);
+    const bar = await page.locator('.device-card .progress-bar').evaluate((el) => el.getBoundingClientRect().height);
+    const fill = await page.locator('.device-card .progress-fill').evaluate((el) => el.getBoundingClientRect().height);
+    expect(fill).toBeGreaterThanOrEqual(3);  // the visible 4px track, not a collapsed sliver
+    expect(bar).toBeGreaterThanOrEqual(12);   // enlarged click target (4px track + padding)
+  });
 });
