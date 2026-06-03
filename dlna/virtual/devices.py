@@ -672,11 +672,14 @@ class VirtualDlnaDevice:
             "members": list(self.member_uuids),
         }
 
-    async def member_details(self) -> List[Dict[str, Any]]:
+    async def member_details(self, resolved=None) -> List[Dict[str, Any]]:
         from plex.adapters import adapter_by_device
         from settings import settings as settings_singleton
 
-        resolved, missing = await self._resolve_members()
+        # summary() resolves members once and passes them in to avoid a second
+        # full physical-device scan + get_data() pass per refresh.
+        if resolved is None:
+            resolved, _ = await self._resolve_members()
         resolved_map = {d.uuid: d for d in resolved}
         details: List[Dict[str, Any]] = []
 
@@ -752,7 +755,7 @@ class VirtualDlnaDevice:
         from plex import pin_login
 
         resolved, missing = await self._resolve_members()
-        details = await self.member_details()
+        details = await self.member_details(resolved)
 
         overall_status = []
         current_track = None
