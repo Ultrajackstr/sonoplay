@@ -86,6 +86,9 @@ test.describe('discovered devices — sendCommand wiring', () => {
 
 test.describe('discovered devices — CSS contract (for the dedup)', () => {
   test('.icon-btn keeps its 36x36 sizing', async ({ page }) => {
+    // .icon-btn has exactly one rule (the one being deduped into the stylesheet);
+    // a botched move would drop the rule and the button would fall back to its
+    // content-sized default rather than 36x36.
     await mockApi(page, { devices: [playing()] });
     await goto(page);
     const box = await page.locator('.device-card .icon-btn').first().evaluate((el) => {
