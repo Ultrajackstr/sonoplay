@@ -990,6 +990,7 @@ class PlexDlnaAdapter(object):
             url = self.queue.url_for_track(track, force_transcode=needs_transcode)
             operation_id = self._start_transport_operation(url)
             self._active_operation_target_paused = paused
+            settled = False
             try:
                 self.current_track_info = track
                 attempt = 0
@@ -1007,6 +1008,13 @@ class PlexDlnaAdapter(object):
             finally:
                 self._finish_transport_operation(operation_id)
             self.current_track_info = track
+            # Resume-to-position: seek only now that the renderer has settled into
+            # PLAYING the target URI. Done here rather than before Play because the
+            # AMBEO (AVTransport:2) rejects a Seek issued mid-load with UPnP 710.
+            # Guarded on `settled` so we never seek a device that didn't load, and
+            # skipped for paused loads (seek-while-paused isn't reliable).
+            if offset and not paused and settled:
+                await self.seek(offset)
         # Gapless: pre-arm the next track so the renderer crosses over at the
         # true end of this one instead of stopping and waiting for us to reload.
         await self._arm_next_track()
@@ -1121,8 +1129,12 @@ class PlexDlnaAdapter(object):
         logger.debug("%s SetAVTransportURI: %s", self.dlna.name, redact_token(url))
         await self.dlna.SetAVTransportURI(url)
         if offset != 0:
+            # Optimistic position for the timeline only. The ACTUAL Seek is
+            # deferred until after Play (see play_selected_queue_item): seeking
+            # here -- while the renderer is still loading right after
+            # SetAVTransportURI -- makes the AMBEO (and other AVTransport:2
+            # renderers) reject it with UPnP 710 "Seek mode not supported".
             self.state.update(position=str(timedelta(milliseconds=offset)))
-            await self.dlna.Seek(str(timedelta(milliseconds=offset)))
         else:
             self.state.update(position="0")
         if paused:
